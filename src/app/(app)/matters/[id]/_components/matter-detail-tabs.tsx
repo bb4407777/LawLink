@@ -4,12 +4,22 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import type { Prisma } from "@prisma/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Layers, Users, Clock, Info, Wallet } from "lucide-react";
+import {
+  Layers,
+  Users,
+  Clock,
+  Info,
+  Wallet,
+  MessageSquare,
+  CheckSquare
+} from "lucide-react";
 import { OverviewPanel } from "./overview-panel";
 import { PartiesPanel } from "./parties-panel";
 import { ProceduresPanel } from "./procedures-panel";
 import { TimelinePanel } from "./timeline-panel";
 import { FinancePanel } from "./finance-panel";
+import { NotesPanel } from "./notes-panel";
+import { TasksPanel } from "./tasks-panel";
 
 type MatterPayload = Prisma.MatterGetPayload<{
   include: {
@@ -27,6 +37,7 @@ type MatterPayload = Prisma.MatterGetPayload<{
         stages: true;
       };
     };
+    tasks: true;
     timelineEvents: true;
   };
 }>;
@@ -76,14 +87,28 @@ export type FinancePayload = {
 
 type UserOption = { id: string; name: string; role: string };
 
+export type NotePayload = {
+  id: string;
+  channel: "PHONE" | "WECHAT" | "EMAIL" | "MEETING" | "COURT" | "OTHER";
+  withWhom: string | null;
+  occurredAt: Date;
+  content: string;
+  tags: string[];
+  author: { id: string; name: string };
+  authorId: string;
+  createdAt: Date;
+};
+
 export function MatterDetailTabs({
   matter,
   finance,
-  userOptions
+  userOptions,
+  notes
 }: {
   matter: MatterPayload;
   finance: FinancePayload;
   userOptions: UserOption[];
+  notes: NotePayload[];
 }) {
   const [tab, setTab] = useState("overview");
 
@@ -113,6 +138,20 @@ export function MatterDetailTabs({
               {matter.parties.length + matter.clientLinks.length}
             </span>
           </TabsTrigger>
+          <TabsTrigger value="tasks" className="gap-1.5">
+            <CheckSquare className="h-3.5 w-3.5" />
+            任务
+            <span className="ml-0.5 font-mono text-[10px] tabular text-muted-foreground">
+              {matter.tasks.filter((t) => !t.completed).length}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="notes" className="gap-1.5">
+            <MessageSquare className="h-3.5 w-3.5" />
+            沟通
+            <span className="ml-0.5 font-mono text-[10px] tabular text-muted-foreground">
+              {notes.length}
+            </span>
+          </TabsTrigger>
           <TabsTrigger value="finance" className="gap-1.5">
             <Wallet className="h-3.5 w-3.5" />
             财务
@@ -132,6 +171,16 @@ export function MatterDetailTabs({
           </TabsContent>
           <TabsContent value="parties" forceMount hidden={tab !== "parties"}>
             <PartiesPanel matter={matter} />
+          </TabsContent>
+          <TabsContent value="tasks" forceMount hidden={tab !== "tasks"}>
+            <TasksPanel
+              matterId={matter.id}
+              tasks={matter.tasks}
+              userOptions={userOptions}
+            />
+          </TabsContent>
+          <TabsContent value="notes" forceMount hidden={tab !== "notes"}>
+            <NotesPanel matterId={matter.id} notes={notes} />
           </TabsContent>
           <TabsContent value="finance" forceMount hidden={tab !== "finance"}>
             <FinancePanel matterId={matter.id} finance={finance} userOptions={userOptions} />

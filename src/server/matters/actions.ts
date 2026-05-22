@@ -89,6 +89,9 @@ export async function getMatterById(id: string) {
           stages: { orderBy: { order: "asc" } }
         }
       },
+      tasks: {
+        orderBy: [{ completed: "asc" }, { dueAt: "asc" }]
+      },
       timelineEvents: { orderBy: { occurredAt: "desc" }, take: 50 }
     }
   });
