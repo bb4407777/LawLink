@@ -7,7 +7,8 @@ import {
   Wallet,
   Calendar,
   FileBox,
-  Settings
+  Settings,
+  ShieldCheck
 } from "lucide-react";
 
 export type NavItem = {
@@ -19,11 +20,12 @@ export type NavItem = {
 
 export const primaryNav: NavItem[] = [
   { label: "仪表盘", href: "/", icon: LayoutDashboard },
-  { label: "收案", href: "/intakes", icon: FileText, badge: 5 },
-  { label: "案件", href: "/matters", icon: FolderOpen, badge: 18 },
+  { label: "收案", href: "/intakes", icon: FileText },
+  { label: "冲突检索", href: "/conflicts", icon: ShieldCheck },
+  { label: "案件", href: "/matters", icon: FolderOpen },
   { label: "客户", href: "/clients", icon: Users },
   { label: "财务", href: "/finance", icon: Wallet },
-  { label: "日程", href: "/schedule", icon: Calendar, badge: 7 },
+  { label: "日程", href: "/schedule", icon: Calendar },
   { label: "材料", href: "/documents", icon: FileBox }
 ];
 

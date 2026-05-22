@@ -1,0 +1,114 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { requireSession } from "@/lib/auth/session";
+import { audit } from "@/server/audit";
+import { runConflictCheck, type QueryItem } from "./algorithm";
+
+const queryItemSchema = z.object({
+  role: z.enum([
+    "CLIENT_PARTY",
+    "OPPOSING_PARTY",
+    "THIRD_PARTY",
+    "CO_LITIGANT",
+    "AGENT",
+    "WITNESS",
+    "OTHER"
+  ]),
+  name: z.string().min(1).max(120),
+  idNumber: z.string().max(50).optional().or(z.literal(""))
+});
+
+const runCheckSchema = z.object({
+  intakeId: z.string().cuid().optional(),
+  queries: z.array(queryItemSchema).min(1)
+});
+
+/**
+ * 跑一次冲突检索并落库。
+ * 如果 intakeId 在，则把 ConflictCheck 挂在该 Intake 上；否则单独存（targetType=Intake 为空）。
+ */
+export async function runCheckAndSave(input: z.infer<typeof runCheckSchema>) {
+  const session = await requireSession();
+  const data = runCheckSchema.parse(input);
+
+  // 清理 query
+  const queries: QueryItem[] = data.queries.map((q) => ({
+    role: q.role,
+    name: q.name.trim(),
+    idNumber: q.idNumber?.trim() || undefined
+  }));
+
+  const draftHits = await runConflictCheck(queries);
+
+  const check = await prisma.conflictCheck.create({
+    data: {
+      intakeId: data.intakeId,
+      queryPayload: { queries } as object,
+      hits: {
+        create: draftHits.map((h) => ({
+          hitType: h.hitType,
+          targetType: h.targetType,
+          targetId: h.targetId,
+          matchedName: h.matchedName,
+          matchedField: h.matchedField,
+          matchedValue: h.matchedValue,
+          matchedRatio: h.matchedRatio,
+          severity: h.severity,
+          reason: h.reason
+        }))
+      }
+    },
+    include: { hits: true }
+  });
+
+  await audit({
+    userId: session.user.id,
+    action: "CONFLICT_CHECK_RUN",
+    targetType: "ConflictCheck",
+    targetId: check.id,
+    detail: { intakeId: data.intakeId, hitCount: draftHits.length }
+  });
+
+  if (data.intakeId) {
+    revalidatePath(`/intakes/${data.intakeId}`);
+  }
+  return { ok: true, checkId: check.id, hits: check.hits };
+}
+
+const conclusionSchema = z.object({
+  checkId: z.string().cuid(),
+  conclusion: z.enum(["PENDING", "SAME_SUBJECT", "DIFFERENT", "NEED_INFO"]),
+  note: z.string().max(500).optional().or(z.literal(""))
+});
+
+export async function setConflictConclusion(input: z.infer<typeof conclusionSchema>) {
+  const session = await requireSession();
+  const data = conclusionSchema.parse(input);
+
+  const updated = await prisma.conflictCheck.update({
+    where: { id: data.checkId },
+    data: {
+      conclusion: data.conclusion,
+      decidedById: session.user.id,
+      decidedAt: new Date(),
+      note: data.note || null
+    },
+    include: { intake: { select: { id: true } } }
+  });
+
+  await audit({
+    userId: session.user.id,
+    action: "CONFLICT_CONCLUSION_SET",
+    targetType: "ConflictCheck",
+    targetId: updated.id,
+    detail: { conclusion: data.conclusion }
+  });
+
+  if (updated.intake) {
+    revalidatePath(`/intakes/${updated.intake.id}`);
+  }
+  return { ok: true };
+}
