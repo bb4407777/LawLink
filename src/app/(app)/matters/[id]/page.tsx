@@ -3,7 +3,9 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getMatterById } from "@/server/matters/actions";
 import { getMatterFinance } from "@/server/finance/actions";
+import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
+import { LifecycleActions } from "./_components/lifecycle-actions";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -16,7 +18,10 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { MatterDetailTabs } from "./_components/matter-detail-tabs";
 
 export default async function MatterDetailPage({ params }: { params: { id: string } }) {
-  const matter = await getMatterById(params.id);
+  const [matter, session] = await Promise.all([
+    getMatterById(params.id),
+    getSession()
+  ]);
   if (!matter) notFound();
 
   const [finance, userOptions, notes] = await Promise.all([
@@ -48,7 +53,16 @@ export default async function MatterDetailPage({ params }: { params: { id: strin
       <header className="rounded-xl border border-border bg-card/40 p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
-            <div className="font-mono text-xs text-muted-foreground">{matter.internalCode}</div>
+            <div className="flex items-center gap-3">
+              <div className="font-mono text-xs text-muted-foreground">{matter.internalCode}</div>
+              {session?.user && (
+                <LifecycleActions
+                  matterId={matter.id}
+                  status={matter.status}
+                  userRole={session.user.role}
+                />
+              )}
+            </div>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">{matter.title}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span

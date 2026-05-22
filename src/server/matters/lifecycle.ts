@@ -1,0 +1,197 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { requireSession } from "@/lib/auth/session";
+import { audit } from "@/server/audit";
+
+const closeMatterSchema = z.object({
+  id: z.string().cuid(),
+  summary: z.string().min(1, "结案小结必填").max(2000)
+});
+
+const archiveMatterSchema = z.object({
+  id: z.string().cuid(),
+  summary: z.string().max(2000).optional().or(z.literal(""))
+});
+
+const holdMatterSchema = z.object({
+  id: z.string().cuid(),
+  reason: z.string().max(500).optional().or(z.literal(""))
+});
+
+export type CloseMatterInput = z.infer<typeof closeMatterSchema>;
+export type ArchiveMatterInput = z.infer<typeof archiveMatterSchema>;
+export type HoldMatterInput = z.infer<typeof holdMatterSchema>;
+
+/**
+ * 结案：把案件状态切到 CLOSED，记录结案小结到 TimelineEvent。
+ * 不强制要求所有 procedure 都 concluded，律师自行判断。
+ */
+export async function closeMatter(input: CloseMatterInput) {
+  const session = await requireSession();
+  const data = closeMatterSchema.parse(input);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.matter.update({
+      where: { id: data.id },
+      data: {
+        status: "CLOSED",
+        closedAt: new Date()
+      }
+    });
+    await tx.timelineEvent.create({
+      data: {
+        matterId: data.id,
+        eventType: "MATTER_CLOSED",
+        title: "案件已结案",
+        content: data.summary,
+        occurredAt: new Date()
+      }
+    });
+  });
+
+  await audit({
+    userId: session.user.id,
+    action: "MATTER_CLOSE",
+    targetType: "Matter",
+    targetId: data.id,
+    detail: { summaryLen: data.summary.length }
+  });
+
+  revalidatePath(`/matters/${data.id}`);
+  revalidatePath("/matters");
+  return { ok: true };
+}
+
+/**
+ * 归档：把案件状态切到 ARCHIVED，创建 ArchiveRecord，归档后变只读。
+ * 仅 ADMIN / PRINCIPAL_LAWYER 可归档。
+ */
+export async function archiveMatter(input: ArchiveMatterInput) {
+  const session = await requireSession();
+  const data = archiveMatterSchema.parse(input);
+
+  if (session.user.role !== "ADMIN" && session.user.role !== "PRINCIPAL_LAWYER") {
+    throw new Error("只有管理员或主办律师可以归档");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const matter = await tx.matter.update({
+      where: { id: data.id },
+      data: {
+        status: "ARCHIVED",
+        archivedAt: new Date(),
+        closedAt: { set: new Date() } // 归档时默认也是结案
+      }
+    });
+
+    await tx.archiveRecord.create({
+      data: {
+        matterId: matter.id,
+        summary: data.summary || "（无）",
+        archivedBy: session.user.name ?? session.user.id
+      }
+    });
+
+    await tx.timelineEvent.create({
+      data: {
+        matterId: matter.id,
+        eventType: "MATTER_ARCHIVED",
+        title: "案件已归档",
+        content: data.summary || undefined,
+        occurredAt: new Date()
+      }
+    });
+  });
+
+  await audit({
+    userId: session.user.id,
+    action: "MATTER_ARCHIVE",
+    targetType: "Matter",
+    targetId: data.id
+  });
+
+  revalidatePath(`/matters/${data.id}`);
+  revalidatePath("/matters");
+  return { ok: true };
+}
+
+/**
+ * 重新开放（从 ON_HOLD / CLOSED 回到 IN_PROGRESS）。
+ * ARCHIVED 状态不能重新开放（如需要应由 ADMIN 走单独路径）。
+ */
+export async function reopenMatter(id: string) {
+  const session = await requireSession();
+  const matter = await prisma.matter.findUnique({ where: { id }, select: { status: true } });
+  if (!matter) throw new Error("案件不存在");
+  if (matter.status === "ARCHIVED") {
+    throw new Error("已归档案件不能重新开放");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.matter.update({
+      where: { id },
+      data: {
+        status: "IN_PROGRESS",
+        closedAt: null
+      }
+    });
+    await tx.timelineEvent.create({
+      data: {
+        matterId: id,
+        eventType: "MATTER_REOPENED",
+        title: "案件已重新开放",
+        occurredAt: new Date()
+      }
+    });
+  });
+
+  await audit({
+    userId: session.user.id,
+    action: "MATTER_REOPEN",
+    targetType: "Matter",
+    targetId: id
+  });
+
+  revalidatePath(`/matters/${id}`);
+  revalidatePath("/matters");
+  return { ok: true };
+}
+
+/**
+ * 暂停案件（客户失联、待补充材料等）。
+ */
+export async function holdMatter(input: HoldMatterInput) {
+  const session = await requireSession();
+  const data = holdMatterSchema.parse(input);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.matter.update({
+      where: { id: data.id },
+      data: { status: "ON_HOLD" }
+    });
+    await tx.timelineEvent.create({
+      data: {
+        matterId: data.id,
+        eventType: "MATTER_ON_HOLD",
+        title: "案件已暂停",
+        content: data.reason || undefined,
+        occurredAt: new Date()
+      }
+    });
+  });
+
+  await audit({
+    userId: session.user.id,
+    action: "MATTER_HOLD",
+    targetType: "Matter",
+    targetId: data.id,
+    detail: { reason: data.reason }
+  });
+
+  revalidatePath(`/matters/${data.id}`);
+  revalidatePath("/matters");
+  return { ok: true };
+}
