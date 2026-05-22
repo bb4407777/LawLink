@@ -30,3 +30,6 @@ dist
 
 # Backup
 *.bak
+
+# TS incremental
+tsconfig.tsbuildinfo
