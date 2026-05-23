@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
+import { assertDocumentWritable } from "@/lib/archive/guard";
 import { writeFile, deleteStoredFile } from "@/lib/storage/local";
 import { encryptBuffer, sha256 } from "@/lib/storage/crypto";
 
@@ -61,7 +62,8 @@ export async function uploadDocument(formData: FormData) {
       select: { id: true, status: true }
     });
     if (!matter) throw new Error("案件不存在");
-    if (matter.status === "ARCHIVED") throw new Error("已归档案件不可上传材料");
+    // 归档后仅允许补传到 ARCHIVE 卷宗（uploadDocument 暂未带 folderId，等同全禁）
+    await assertDocumentWritable(matterId, { kind: "upload", folderName: null });
   }
   if (intakeId) {
     const intake = await prisma.intake.findUnique({
@@ -137,6 +139,7 @@ export async function deleteDocument(id: string) {
   ) {
     throw new Error("只能删除自己上传的材料（或由 ADMIN/主办删除）");
   }
+  await assertDocumentWritable(doc.matterId, { kind: "modify" });
 
   // 软删除（保留文件以备审计），如需物理删除走单独脚本
   await prisma.document.update({
@@ -164,6 +167,7 @@ export async function hardDeleteDocument(id: string) {
   }
   const doc = await prisma.document.findUnique({ where: { id } });
   if (!doc) return { ok: false };
+  await assertDocumentWritable(doc.matterId, { kind: "modify" });
 
   await deleteStoredFile(doc.path);
   await prisma.document.delete({ where: { id } });

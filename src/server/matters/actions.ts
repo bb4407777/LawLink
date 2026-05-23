@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
+import { assertMatterWritable } from "@/lib/archive/guard";
 import { generateInternalCode } from "./code-generator";
 import { seedDefaultFolders } from "@/lib/default-folders";
 import {
@@ -242,6 +243,7 @@ export async function updateMatterTeam(input: {
     select: { id: true, ownerId: true }
   });
   if (!matter) throw new Error("案件不存在");
+  await assertMatterWritable(input.matterId);
 
   const canEdit =
     session.user.role === "ADMIN" ||

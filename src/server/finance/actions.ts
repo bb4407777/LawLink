@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
+import { assertMatterWritable } from "@/lib/archive/guard";
 import {
   billingCreateSchema,
   feeEntryCreateSchema,
@@ -19,6 +20,7 @@ import {
 export async function createBilling(input: BillingCreateInput) {
   const session = await requireSession();
   const data = billingCreateSchema.parse(input);
+  await assertMatterWritable(data.matterId);
 
   const created = await prisma.billing.create({
     data: {
@@ -54,6 +56,7 @@ export async function deleteBilling(id: string) {
   if (session.user.role !== "ADMIN" && session.user.role !== "PRINCIPAL_LAWYER") {
     throw new Error("只有管理员或主办律师可以删除合同");
   }
+  await assertMatterWritable(billing.matterId);
 
   await prisma.billing.delete({ where: { id } });
   await audit({
@@ -76,6 +79,7 @@ export async function deleteBilling(id: string) {
 export async function createFeeEntry(input: FeeEntryCreateInput) {
   const session = await requireSession();
   const data = feeEntryCreateSchema.parse(input);
+  await assertMatterWritable(data.matterId);
 
   const created = await prisma.$transaction(async (tx) => {
     const entry = await tx.feeEntry.create({
@@ -153,6 +157,7 @@ export async function deleteFeeEntry(id: string) {
     include: { commissionChildren: { select: { id: true } } }
   });
   if (!entry) return { ok: false };
+  await assertMatterWritable(entry.matterId);
 
   // 删父条目时同时删除自动派生的分成
   await prisma.$transaction(async (tx) => {
@@ -188,6 +193,7 @@ export async function deleteFeeEntry(id: string) {
 export async function setCommissionPlan(input: CommissionPlanSetInput) {
   const session = await requireSession();
   const data = commissionPlanSetSchema.parse(input);
+  await assertMatterWritable(data.matterId);
 
   await prisma.$transaction([
     prisma.commissionPlan.deleteMany({ where: { matterId: data.matterId } }),

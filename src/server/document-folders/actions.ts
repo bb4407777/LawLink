@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
+import { assertMatterWritable } from "@/lib/archive/guard";
 import {
   folderCreateSchema,
   folderRenameSchema,
@@ -40,6 +41,7 @@ export async function createFolder(input: z.infer<typeof folderCreateSchema>) {
   const session = await requireSession();
   const data = folderCreateSchema.parse(input);
   await requireFolderEditor(data.matterId, session);
+  await assertMatterWritable(data.matterId);
 
   // 计算 orderIndex（追加到末尾）
   const last = await prisma.documentFolder.findFirst({
@@ -88,6 +90,7 @@ export async function renameFolder(input: z.infer<typeof folderRenameSchema>) {
   });
   if (!folder) throw new Error("卷宗不存在");
   await requireFolderEditor(folder.matterId, session);
+  await assertMatterWritable(folder.matterId);
 
   try {
     await prisma.documentFolder.update({
@@ -124,6 +127,7 @@ export async function deleteFolder(input: z.infer<typeof folderDeleteSchema>) {
   if (!folder) throw new Error("卷宗不存在");
   if (folder.isDefault) throw new Error("默认卷宗不可删除，只能改名");
   await requireFolderEditor(folder.matterId, session);
+  await assertMatterWritable(folder.matterId);
 
   // 卷宗内的文档不删，移到"散件"（folderId = null）
   await prisma.$transaction([
@@ -150,6 +154,7 @@ export async function reorderFolders(input: z.infer<typeof folderReorderSchema>)
   const session = await requireSession();
   const data = folderReorderSchema.parse(input);
   await requireFolderEditor(data.matterId, session);
+  await assertMatterWritable(data.matterId);
 
   await prisma.$transaction(
     data.orderedIds.map((id, i) =>
@@ -185,6 +190,7 @@ export async function moveDocumentToFolder(input: z.infer<typeof moveDocumentToF
     }
   }
   await requireFolderEditor(doc.matterId, session);
+  await assertMatterWritable(doc.matterId);
 
   await prisma.document.update({
     where: { id: data.documentId },

@@ -6,6 +6,7 @@ import { Prisma, type SealType, type UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
+import { assertMatterWritable } from "@/lib/archive/guard";
 import { readFile, writeFile } from "@/lib/storage/local";
 import { decryptBuffer, encryptBuffer, sha256 } from "@/lib/storage/crypto";
 import {
@@ -202,6 +203,7 @@ export async function createSealRequest(formData: FormData) {
 
   // 若有 matterId 校验存在
   if (data.matterId) {
+    await assertMatterWritable(data.matterId);
     const m = await prisma.matter.findUnique({
       where: { id: data.matterId },
       select: { id: true }

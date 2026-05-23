@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
+import { assertMatterWritable } from "@/lib/archive/guard";
 
 const taskCreateSchema = z.object({
   matterId: z.string().cuid(),
@@ -26,6 +27,7 @@ export type TaskUpdateInput = z.infer<typeof taskUpdateSchema>;
 export async function createTask(input: TaskCreateInput) {
   const session = await requireSession();
   const data = taskCreateSchema.parse(input);
+  await assertMatterWritable(data.matterId);
 
   const created = await prisma.task.create({
     data: {
@@ -54,6 +56,7 @@ export async function createTask(input: TaskCreateInput) {
 export async function updateTask(input: TaskUpdateInput) {
   const session = await requireSession();
   const data = taskUpdateSchema.parse(input);
+  await assertMatterWritable(data.matterId);
   const { id, matterId, ...rest } = data;
 
   await prisma.task.update({
@@ -83,6 +86,7 @@ export async function toggleTaskCompleted(id: string) {
   const session = await requireSession();
   const current = await prisma.task.findUnique({ where: { id } });
   if (!current) return { ok: false };
+  await assertMatterWritable(current.matterId);
 
   const next = !current.completed;
   await prisma.task.update({
@@ -108,6 +112,7 @@ export async function deleteTask(id: string) {
   const session = await requireSession();
   const current = await prisma.task.findUnique({ where: { id } });
   if (!current) return { ok: false };
+  await assertMatterWritable(current.matterId);
 
   await prisma.task.delete({ where: { id } });
 

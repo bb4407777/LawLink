@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
+import { assertMatterWritable } from "@/lib/archive/guard";
 import { writeFile } from "@/lib/storage/local";
 import { encryptBuffer, sha256 } from "@/lib/storage/crypto";
 
@@ -28,6 +29,7 @@ const createSchema = z.object({
 export async function createInvoiceRequest(input: z.infer<typeof createSchema>) {
   const session = await requireSession();
   const data = createSchema.parse(input);
+  await assertMatterWritable(data.matterId);
 
   // 申请权限：LEAD / CO_LEAD / ADMIN / PRINCIPAL_LAWYER
   const isAdmin = session.user.role === "ADMIN" || session.user.role === "PRINCIPAL_LAWYER";

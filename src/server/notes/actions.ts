@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
+import { assertMatterWritable } from "@/lib/archive/guard";
 
 const noteChannelSchema = z.enum(["PHONE", "WECHAT", "EMAIL", "MEETING", "COURT", "OTHER"]);
 
@@ -27,6 +28,7 @@ export type NoteUpdateInput = z.infer<typeof noteUpdateSchema>;
 export async function createNote(input: NoteCreateInput) {
   const session = await requireSession();
   const data = noteCreateSchema.parse(input);
+  await assertMatterWritable(data.matterId);
 
   const created = await prisma.note.create({
     data: {
@@ -61,6 +63,7 @@ export async function updateNote(input: NoteUpdateInput) {
   if (existing.authorId !== session.user.id && session.user.role !== "ADMIN") {
     throw new Error("只能编辑自己的沟通记录");
   }
+  await assertMatterWritable(existing.matterId);
 
   await prisma.note.update({
     where: { id: data.id },
@@ -91,6 +94,7 @@ export async function deleteNote(id: string) {
   if (existing.authorId !== session.user.id && session.user.role !== "ADMIN") {
     throw new Error("只能删除自己的沟通记录");
   }
+  await assertMatterWritable(existing.matterId);
 
   await prisma.note.update({
     where: { id },

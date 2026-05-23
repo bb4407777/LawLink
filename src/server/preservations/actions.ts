@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
+import { assertMatterWritable } from "@/lib/archive/guard";
 import {
   preservationCreateSchema,
   preservationUpdateSchema,
@@ -94,6 +95,7 @@ export async function createPreservation(input: z.infer<typeof preservationCreat
       select: { id: true }
     });
     if (!m) throw new Error("关联案件不存在");
+    await assertMatterWritable(data.matterId);
   }
 
   const created = await prisma.preservation.create({
@@ -142,6 +144,10 @@ export async function updatePreservation(input: z.infer<typeof preservationUpdat
     select: { id: true, matterId: true }
   });
   if (!existing) throw new Error("保全记录不存在");
+  await assertMatterWritable(existing.matterId);
+  if (matterId !== undefined && matterId !== existing.matterId) {
+    await assertMatterWritable(matterId);
+  }
 
   if (rest.startDate && rest.expiryDate && rest.expiryDate <= rest.startDate) {
     throw new Error("到期日期必须晚于生效日期");
@@ -185,6 +191,7 @@ export async function renewPreservation(input: z.infer<typeof preservationRenewS
   });
   if (!pres) throw new Error("保全记录不存在");
   if (pres.status === "LIFTED") throw new Error("已解除的保全不可续保");
+  await assertMatterWritable(pres.matterId);
   if (data.newExpiryDate <= pres.expiryDate) {
     throw new Error(`新到期日必须晚于原到期日（${pres.expiryDate.toISOString().slice(0, 10)}）`);
   }
@@ -232,6 +239,7 @@ export async function liftPreservation(input: z.infer<typeof preservationLiftSch
     select: { id: true, matterId: true, note: true }
   });
   if (!pres) throw new Error("保全记录不存在");
+  await assertMatterWritable(pres.matterId);
 
   await prisma.preservation.update({
     where: { id: data.id },
@@ -266,6 +274,7 @@ export async function deletePreservation(input: z.infer<typeof preservationIdSch
     select: { id: true, matterId: true }
   });
   if (!pres) throw new Error("保全记录不存在");
+  await assertMatterWritable(pres.matterId);
 
   await prisma.preservation.delete({ where: { id: data.id } });
 

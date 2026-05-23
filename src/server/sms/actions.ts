@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
+import { assertMatterWritable } from "@/lib/archive/guard";
 import { parseSms, splitSmsBatch, toDate, type ParsedSms } from "@/lib/sms-parser";
 import { enrichWithAi } from "@/lib/sms-parser-ai";
 import {
@@ -141,6 +142,7 @@ export async function getSmsMessage(id: string) {
 export async function matchSmsToMatter(input: z.infer<typeof smsMatchToMatterSchema>) {
   const session = await requireSession();
   const data = smsMatchToMatterSchema.parse(input);
+  if (data.matterId) await assertMatterWritable(data.matterId);
 
   await prisma.smsMessage.update({
     where: { id: data.smsId },
@@ -175,6 +177,7 @@ export async function generateHearingFromSms(input: z.infer<typeof smsGenerateHe
     select: { id: true, matterId: true }
   });
   if (!proc) throw new Error("程序不存在");
+  await assertMatterWritable(proc.matterId);
 
   const hearing = await prisma.hearing.create({
     data: {
@@ -222,6 +225,7 @@ export async function generateDeadlineFromSms(input: z.infer<typeof smsGenerateD
     select: { id: true, matterId: true }
   });
   if (!proc) throw new Error("程序不存在");
+  await assertMatterWritable(proc.matterId);
 
   const deadline = await prisma.deadline.create({
     data: {

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
+import { assertMatterWritable } from "@/lib/archive/guard";
 import {
   procedureCreateSchema,
   procedureUpdateSchema,
@@ -28,6 +29,7 @@ function emptyToNull<T extends Record<string, unknown>>(obj: T): T {
 export async function addProcedure(input: ProcedureCreateInput) {
   const session = await requireSession();
   const data = procedureCreateSchema.parse(input);
+  await assertMatterWritable(data.matterId);
 
   const lastOrder = await prisma.matterProcedure.findFirst({
     where: { matterId: data.matterId },
@@ -79,6 +81,13 @@ export async function updateProcedure(input: ProcedureUpdateInput) {
   const data = procedureUpdateSchema.parse(input);
   const { id, ...rest } = data;
 
+  const existing = await prisma.matterProcedure.findUnique({
+    where: { id },
+    select: { matterId: true }
+  });
+  if (!existing) throw new Error("程序不存在");
+  await assertMatterWritable(existing.matterId);
+
   const updated = await prisma.matterProcedure.update({
     where: { id },
     data: emptyToNull(rest)
@@ -103,6 +112,7 @@ export async function deleteProcedure(id: string) {
   if (session.user.role !== "ADMIN" && session.user.role !== "PRINCIPAL_LAWYER") {
     throw new Error("只有管理员或主办律师可以删除程序");
   }
+  await assertMatterWritable(procedure.matterId);
 
   await prisma.matterProcedure.delete({ where: { id } });
   await audit({
@@ -122,6 +132,13 @@ export async function deleteProcedure(id: string) {
 export async function addDeadline(input: DeadlineCreateInput) {
   const session = await requireSession();
   const data = deadlineCreateSchema.parse(input);
+
+  const procedureForGuard = await prisma.matterProcedure.findUnique({
+    where: { id: data.procedureId },
+    select: { matterId: true }
+  });
+  if (!procedureForGuard) throw new Error("程序不存在");
+  await assertMatterWritable(procedureForGuard.matterId);
 
   const created = await prisma.deadline.create({
     data: {
@@ -160,6 +177,7 @@ export async function toggleDeadlineCompleted(id: string) {
     include: { procedure: { select: { matterId: true } } }
   });
   if (!current) return { ok: false };
+  await assertMatterWritable(current.procedure.matterId);
 
   const next = !current.completed;
   await prisma.deadline.update({
@@ -188,6 +206,7 @@ export async function deleteDeadline(id: string) {
     include: { procedure: { select: { matterId: true } } }
   });
   if (!current) return { ok: false };
+  await assertMatterWritable(current.procedure.matterId);
 
   await prisma.deadline.delete({ where: { id } });
   await audit({
@@ -205,6 +224,13 @@ export async function deleteDeadline(id: string) {
 export async function addHearing(input: HearingCreateInput) {
   const session = await requireSession();
   const data = hearingCreateSchema.parse(input);
+
+  const procedureForGuard = await prisma.matterProcedure.findUnique({
+    where: { id: data.procedureId },
+    select: { matterId: true }
+  });
+  if (!procedureForGuard) throw new Error("程序不存在");
+  await assertMatterWritable(procedureForGuard.matterId);
 
   const created = await prisma.hearing.create({
     data: {
@@ -255,6 +281,7 @@ export async function deleteHearing(id: string) {
     include: { procedure: { select: { matterId: true } } }
   });
   if (!current) return { ok: false };
+  await assertMatterWritable(current.procedure.matterId);
 
   await prisma.hearing.delete({ where: { id } });
   await audit({
