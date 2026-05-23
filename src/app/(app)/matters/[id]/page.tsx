@@ -5,7 +5,6 @@ import { getMatterById } from "@/server/matters/actions";
 import { getMatterFinance } from "@/server/finance/actions";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
-import { LifecycleActions } from "./_components/lifecycle-actions";
 import { MatterDetailTabs } from "./_components/matter-detail-tabs";
 
 export default async function MatterDetailPage({ params }: { params: { id: string } }) {
@@ -89,22 +88,13 @@ export default async function MatterDetailPage({ params }: { params: { id: strin
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Link
-          href="/matters"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          返回案件列表
-        </Link>
-        {session?.user && (
-          <LifecycleActions
-            matterId={matter.id}
-            status={matter.status}
-            userRole={session.user.role}
-          />
-        )}
-      </div>
+      <Link
+        href="/matters"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        返回案件列表
+      </Link>
 
       <MatterDetailTabs
         matter={matter}
@@ -119,6 +109,7 @@ export default async function MatterDetailPage({ params }: { params: { id: strin
           ...t,
           variables: Array.isArray(t.variables) ? (t.variables as string[]) : []
         }))}
+        currentUserRole={session?.user.role ?? null}
       />
     </div>
   );

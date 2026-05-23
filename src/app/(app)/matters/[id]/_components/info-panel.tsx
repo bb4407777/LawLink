@@ -1,29 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import {
   Users,
   CalendarClock,
   Gavel,
   FileText,
   Download,
-  Pencil,
-  ArrowUpRight
+  Pencil
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  userRoleLabel,
-  matterCategoryLabel,
-  matterCategoryColor,
-  matterStatusLabel,
-  litigationStandingLabel
-} from "@/lib/enums";
+import { userRoleLabel } from "@/lib/enums";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type { MatterPayload, UserOption } from "./matter-detail-tabs";
 import type { DocumentPayload } from "./documents-panel";
 import { TeamEditorDialog } from "./team-editor-dialog";
+import { PartiesPanel } from "./parties-panel";
 
 export function InfoPanel({
   matter,
@@ -54,77 +46,27 @@ export function InfoPanel({
     .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
     .slice(0, 3);
 
-  const clientParty = matter.primaryClient;
-  const opposing = matter.parties.filter((p) => p.role === "OPPOSING_PARTY");
-  const third = matter.parties.filter((p) => p.role === "THIRD_PARTY");
-
   return (
     <div className="space-y-5">
-      {/* editorial 案件头 */}
-      <section className="relative overflow-hidden">
-        <div
-          className="pointer-events-none absolute right-0 top-0 h-32 w-64 -translate-y-1/3 translate-x-1/4 rounded-full opacity-40 blur-3xl"
-          style={{ background: matterCategoryColor[matter.category] }}
-          aria-hidden
-        />
-
-        <div className="relative">
-          <div className="font-eyebrow text-[0.58rem] text-muted-foreground">
-            Case File
-          </div>
-          <div className="mt-1 font-mono text-[11px] tracking-widest text-muted-foreground tabular">
-            {matter.internalCode}
-          </div>
-          <h2 className="ll-h2 mt-1.5 max-w-3xl">{matter.title}</h2>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px]"
-              style={{
-                borderColor: `${matterCategoryColor[matter.category]}55`,
-                color: matterCategoryColor[matter.category],
-                background: `${matterCategoryColor[matter.category]}0F`
-              }}
-            >
-              <span
-                className="h-1 w-1 rounded-full"
-                style={{ backgroundColor: matterCategoryColor[matter.category] }}
-              />
-              {matterCategoryLabel[matter.category]}
-            </span>
-            <span
-              className="rounded-full border px-2.5 py-0.5 text-[11px] text-foreground/80"
-              style={{ borderColor: "hsl(var(--border))" }}
-            >
-              {matterStatusLabel[matter.status]}
-            </span>
-            {matter.ourStanding && (
-              <span className="ll-chip ll-chip-primary text-[11px]">
-                我方 · {litigationStandingLabel[matter.ourStanding]}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="ll-rule mt-4" />
-
-        <dl className="mt-4 grid grid-cols-2 gap-y-4 md:grid-cols-4">
-          <Datum label="Cause of Action / 案由">
+      {/* 4 数据点（H1 已展示编号/类别/状态/名/客户/案由） */}
+      <section className="ll-surface rounded-lg border border-hairline p-4">
+        <dl className="grid grid-cols-2 gap-y-3 md:grid-cols-4">
+          <Datum label="案由">
             {matter.cause?.name ?? matter.causeFreeText ?? "—"}
           </Datum>
-          <Datum label="Claim Amount / 标的">
+          <Datum label="涉案标的">
             {matter.claimAmount ? (
-              <span className="font-mono tabular">
+              <span className="font-mono">
                 {formatCurrency(Number(matter.claimAmount))}
               </span>
             ) : (
               "—"
             )}
           </Datum>
-          <Datum label="Intake Date / 收案日">
+          <Datum label="收案日">
             {matter.intakeDate ? formatDate(matter.intakeDate) : "—"}
           </Datum>
-          <Datum label="First Accepted / 立案日">
+          <Datum label="立案日">
             {matter.firstAcceptedAt ? formatDate(matter.firstAcceptedAt) : "—"}
           </Datum>
         </dl>
@@ -136,57 +78,15 @@ export function InfoPanel({
         <div className="space-y-4 lg:col-span-8">
           {/* 当事人 */}
           <section className="ll-surface p-5">
-            <CardHeader eyebrow="Parties" title="当事人" icon={Users} />
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-              <PartyColumn title="委托方" color="#5B8DEF">
-                {clientParty ? (
-                  <PartyCard
-                    name={clientParty.name}
-                    sub={
-                      matter.ourStanding ? litigationStandingLabel[matter.ourStanding] : undefined
-                    }
-                    href={`/clients/${clientParty.id}`}
-                  />
-                ) : (
-                  <Empty />
-                )}
-              </PartyColumn>
-              <PartyColumn title="对方" color="#EA580C">
-                {opposing.length === 0 ? (
-                  <Empty />
-                ) : (
-                  opposing.map((p) => (
-                    <PartyCard
-                      key={p.id}
-                      name={p.name}
-                      sub={
-                        p.standing ? litigationStandingLabel[p.standing] : p.idNumber ?? undefined
-                      }
-                    />
-                  ))
-                )}
-              </PartyColumn>
-              <PartyColumn title="第三人" color="#9B7BF7">
-                {third.length === 0 ? (
-                  <Empty />
-                ) : (
-                  third.map((p) => (
-                    <PartyCard
-                      key={p.id}
-                      name={p.name}
-                      sub={
-                        p.standing ? litigationStandingLabel[p.standing] : p.idNumber ?? undefined
-                      }
-                    />
-                  ))
-                )}
-              </PartyColumn>
+            <CardHeader title="当事人" icon={Users} />
+            <div className="mt-3">
+              <PartiesPanel matter={matter} />
             </div>
           </section>
 
           {/* 近期期限 */}
           <section className="ll-surface p-5">
-            <CardHeader eyebrow="Upcoming Deadlines" title="近期期限" icon={CalendarClock} />
+            <CardHeader title="近期期限" icon={CalendarClock} />
             {upcomingDeadlines.length === 0 ? (
               <p className="mt-4 text-center text-xs text-muted-foreground">
                 暂无未完成的期限
@@ -240,7 +140,7 @@ export function InfoPanel({
 
           {/* 近期开庭 */}
           <section className="ll-surface p-5">
-            <CardHeader eyebrow="Upcoming Hearings" title="近期开庭" icon={Gavel} />
+            <CardHeader title="近期开庭" icon={Gavel} />
             {upcomingHearings.length === 0 ? (
               <p className="mt-4 text-center text-xs text-muted-foreground">暂无</p>
             ) : (
@@ -269,7 +169,6 @@ export function InfoPanel({
           {/* 团队 */}
           <section className="ll-surface p-6">
             <CardHeader
-              eyebrow="Counsel"
               title="团队"
               icon={Users}
               action={
@@ -326,7 +225,7 @@ export function InfoPanel({
 
           {/* 委托合同 */}
           <section className="ll-surface p-6">
-            <CardHeader eyebrow="Engagement" title="委托合同" icon={FileText} />
+            <CardHeader title="委托合同" icon={FileText} />
             {intakeContracts.length === 0 ? (
               <p className="mt-4 text-center text-xs text-muted-foreground">
                 收案时未上传委托合同
@@ -364,22 +263,6 @@ export function InfoPanel({
             )}
           </section>
 
-          {/* 财务入口提示 */}
-          <Link
-            href={`/matters/${matter.id}#resources`}
-            className={cn(
-              "group flex items-center justify-between rounded-lg border px-5 py-4 text-sm transition-colors",
-              "border-primary/25 bg-primary/5 hover:bg-primary/10"
-            )}
-          >
-            <span className="text-foreground/85">
-              财务流水与开票申请<span className="text-muted-subtle"> · 案件资料</span>
-            </span>
-            <ArrowUpRight
-              className="h-4 w-4 text-primary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-              strokeWidth={1.8}
-            />
-          </Link>
         </div>
       </div>
 
@@ -404,100 +287,28 @@ export function InfoPanel({
 function Datum({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="font-eyebrow text-[0.58rem] text-muted-foreground">{label}</div>
-      <div className="mt-2 text-[0.92rem] text-foreground">{children}</div>
+      <div className="text-[10px] tracking-wider text-muted-foreground">{label}</div>
+      <div className="mt-1 text-[13px] text-foreground">{children}</div>
     </div>
   );
 }
 
 function CardHeader({
-  eyebrow,
   title,
   icon: Icon,
   action
 }: {
-  eyebrow: string;
   title: string;
   icon: typeof Users;
   action?: React.ReactNode;
 }) {
   return (
-    <header className="flex items-end justify-between">
-      <div>
-        <div className="flex items-center gap-2">
-          <Icon className="h-3.5 w-3.5 text-primary" strokeWidth={1.8} />
-          <span className="font-eyebrow text-[0.58rem] text-muted-foreground">
-            {eyebrow}
-          </span>
-        </div>
-        <div className="mt-0.5 font-display text-[1rem] tracking-tight">{title}</div>
+    <header className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5 text-primary" strokeWidth={1.8} />
+        <span className="font-display text-[15px] italic">{title}</span>
       </div>
       {action}
     </header>
-  );
-}
-
-function PartyColumn({
-  title,
-  color,
-  children
-}: {
-  title: string;
-  color: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className="mb-2 flex items-center gap-2">
-        <span
-          className="h-2 w-2 rounded-full"
-          style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}80` }}
-        />
-        <span className="font-eyebrow text-[0.58rem] text-muted-foreground">
-          {title}
-        </span>
-      </div>
-      <div className="space-y-1.5">{children}</div>
-    </div>
-  );
-}
-
-function PartyCard({
-  name,
-  sub,
-  href
-}: {
-  name: string;
-  sub?: string;
-  href?: string;
-}) {
-  const inner = (
-    <div
-      className="rounded-md border bg-card/40 px-3.5 py-2.5 transition-colors hover:border-border"
-      style={{ borderColor: "hsl(var(--hairline))" }}
-    >
-      <div className="truncate text-[0.875rem] font-medium">{name}</div>
-      {sub && (
-        <div className="mt-0.5 text-[11px] text-muted-foreground">{sub}</div>
-      )}
-    </div>
-  );
-  return href ? (
-    <Link href={href} className="block transition-opacity hover:opacity-90">
-      {inner}
-    </Link>
-  ) : (
-    inner
-  );
-}
-
-function Empty() {
-  return (
-    <div
-      className="rounded-md border border-dashed py-3 text-center text-[11px] text-muted-foreground"
-      style={{ borderColor: "hsl(var(--hairline))" }}
-    >
-      —
-    </div>
   );
 }
