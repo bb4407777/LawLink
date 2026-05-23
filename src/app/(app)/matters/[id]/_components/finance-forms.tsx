@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2, Paperclip, FileText } from "lucide-react";
+import { Loader2, Plus, Trash2, Paperclip, FileText, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,6 +37,7 @@ import {
   setCommissionPlan
 } from "@/server/finance/actions";
 import { uploadDocument } from "@/server/documents/actions";
+import { recognizeInvoiceFromImage, type RecognizedInvoice } from "@/server/ai/actions";
 import { userRoleLabel } from "@/lib/enums";
 
 // ============ AddBillingSheet ============
@@ -321,6 +322,25 @@ export function AddFeeEntrySheet({
               <Input className="font-mono" {...register("invoiceNo")} />
             </Field>
 
+            <InvoiceOcrBlock
+              onRecognized={(data) => {
+                if (data.invoiceNumber)
+                  setValue("invoiceNo", data.invoiceNumber, { shouldDirty: true });
+                if (data.totalWithTax || data.totalAmount) {
+                  setValue("amount", Number(data.totalWithTax ?? data.totalAmount), {
+                    shouldDirty: true
+                  });
+                }
+                if (data.sellerName)
+                  setValue("payerOrPayee", data.sellerName, { shouldDirty: true });
+                if (data.invoiceDate) {
+                  const d = new Date(data.invoiceDate);
+                  if (!isNaN(d.getTime()))
+                    setValue("occurredAt", d, { shouldDirty: true });
+                }
+              }}
+            />
+
             <Field label="备注">
               <Textarea rows={2} {...register("note")} />
             </Field>
@@ -519,6 +539,106 @@ export function EditCommissionPlanDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ============ Invoice OCR ============
+
+function InvoiceOcrBlock({
+  onRecognized
+}: {
+  onRecognized: (data: RecognizedInvoice) => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState<RecognizedInvoice | null>(null);
+
+  const recognize = async () => {
+    if (!file) {
+      toast.warning("请先选择发票图片");
+      return;
+    }
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.set("file", file);
+      const res = await recognizeInvoiceFromImage(fd);
+      if (!res.ok) {
+        toast.error(res.message);
+        return;
+      }
+      setPreview(res.data);
+      onRecognized(res.data);
+      toast.success("已识别并自动填入");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "识别失败");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-1.5 rounded-md border border-dashed border-hairline bg-muted/20 p-3">
+      <Label className="flex items-center gap-1.5 text-xs">
+        <Sparkles className="h-3 w-3 text-primary" />
+        AI 发票识别（可选）
+      </Label>
+      <p className="text-[11px] text-muted-foreground">
+        上传增值税发票图，识别后自动填发票号 / 金额 / 销售方 / 开票日
+      </p>
+      <div className="flex items-center gap-2">
+        <label className="flex flex-1 cursor-pointer items-center gap-2 rounded border border-hairline bg-background/60 px-2.5 py-1.5 text-[11px] text-muted-foreground hover:bg-muted/30">
+          <Paperclip className="h-3 w-3" />
+          {file ? (
+            <span className="flex items-center gap-1 text-foreground">
+              <FileText className="h-3 w-3" />
+              {file.name}
+            </span>
+          ) : (
+            "选择发票图（JPG / PNG）"
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              setFile(e.target.files?.[0] ?? null);
+              setPreview(null);
+            }}
+          />
+        </label>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={recognize}
+          disabled={!file || busy}
+          className="h-8 gap-1 text-[11px]"
+        >
+          {busy && <Loader2 className="h-3 w-3 animate-spin" />}
+          识别
+        </Button>
+      </div>
+      {preview && (
+        <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 rounded border border-hairline bg-background/40 p-2 text-[10.5px] text-muted-foreground">
+          {preview.invoiceType && <div>类型：{preview.invoiceType}</div>}
+          {preview.invoiceNumber && (
+            <div>
+              发票号：<span className="font-mono text-foreground/85">{preview.invoiceNumber}</span>
+            </div>
+          )}
+          {preview.invoiceDate && <div>开票日：{preview.invoiceDate}</div>}
+          {preview.sellerName && <div>销售方：{preview.sellerName}</div>}
+          {preview.buyerName && <div>购买方：{preview.buyerName}</div>}
+          {preview.totalWithTax != null && (
+            <div>
+              价税合计：
+              <span className="font-mono text-foreground/85">¥{preview.totalWithTax}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
