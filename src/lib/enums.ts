@@ -8,7 +8,9 @@ import type {
   IntakeStatus,
   UserRole,
   ProcedureType,
-  LitigationStanding
+  LitigationStanding,
+  FeeType,
+  InvoiceRequestStatus
 } from "@prisma/client";
 
 export const clientTypeLabel: Record<ClientType, string> = {
@@ -62,12 +64,24 @@ export const litigationStandingLabel: Record<LitigationStanding, string> = {
   PLAINTIFF: "原告",
   DEFENDANT: "被告",
   THIRD_PARTY: "第三人",
+  COUNTERCLAIM_PLAINTIFF: "反诉原告",
+  COUNTERCLAIM_DEFENDANT: "反诉被告",
+  APPELLANT: "上诉人",
+  APPELLEE: "被上诉人",
+  RETRIAL_APPLICANT: "再审申请人",
+  RETRIAL_RESPONDENT: "再审被申请人",
+  ENFORCEMENT_APPLICANT: "申请执行人",
+  EXECUTED_PERSON: "被执行人",
   CRIMINAL_DEFENDANT: "刑事被告人",
   CRIMINAL_VICTIM: "被害人",
   PRIVATE_PROSECUTOR: "自诉人",
   CRIMINAL_INCIDENTAL_PLAINTIFF: "刑事附带民事原告",
   ARBITRATION_CLAIMANT: "仲裁申请人",
   ARBITRATION_RESPONDENT: "仲裁被申请人",
+  ADMIN_PLAINTIFF: "行政原告",
+  ADMIN_DEFENDANT: "行政被告",
+  ADMIN_RECONSIDERATION_APPLICANT: "复议申请人",
+  ADMIN_RECONSIDERATION_RESPONDENT: "复议被申请人",
   NON_LITIGATION_PARTY: "项目当事人"
 };
 
@@ -95,3 +109,92 @@ export const procedureTypeLabel: Record<ProcedureType, string> = {
   NON_LITIGATION_PHASE: "非诉阶段",
   CUSTOM: "自定义"
 };
+
+export const feeTypeLabel: Record<FeeType, string> = {
+  LUMP_SUM: "一次性",
+  INSTALLMENT: "分期支付",
+  CONTINGENCY_FULL: "风险代理 · 纯后付",
+  CONTINGENCY_PARTIAL: "风险代理 · 部分后付",
+  HOURLY: "按小时计费"
+};
+
+export const invoiceRequestStatusLabel: Record<InvoiceRequestStatus, string> = {
+  PENDING: "待财务处理",
+  APPROVED: "已批准",
+  ISSUED: "已开具",
+  REJECTED: "已驳回"
+};
+
+export const invoiceRequestStatusColor: Record<InvoiceRequestStatus, string> = {
+  PENDING: "#FBBF24",
+  APPROVED: "#5B8DEF",
+  ISSUED: "#4ADE80",
+  REJECTED: "#F87171"
+};
+
+/**
+ * 按程序类型 + 立场（我方 or 对方）返回可选诉讼地位枚举。
+ * 用于收案表单 / 案件详情中的当事人录入联动。
+ */
+export function procedureToStandingOptions(
+  proc: ProcedureType | null | undefined,
+  side: "ours" | "opposite"
+): LitigationStanding[] {
+  if (!proc) return Object.keys(litigationStandingLabel) as LitigationStanding[];
+
+  switch (proc) {
+    case "FIRST_INSTANCE":
+    case "REMAND_FIRST":
+      return side === "ours"
+        ? ["PLAINTIFF", "DEFENDANT", "THIRD_PARTY", "COUNTERCLAIM_PLAINTIFF", "COUNTERCLAIM_DEFENDANT"]
+        : ["PLAINTIFF", "DEFENDANT", "THIRD_PARTY", "COUNTERCLAIM_PLAINTIFF", "COUNTERCLAIM_DEFENDANT"];
+
+    case "SECOND_INSTANCE":
+    case "REMAND_SECOND":
+      return ["APPELLANT", "APPELLEE", "THIRD_PARTY"];
+
+    case "RETRIAL_REVIEW":
+    case "RETRIAL":
+      return ["RETRIAL_APPLICANT", "RETRIAL_RESPONDENT", "THIRD_PARTY"];
+
+    case "PROSECUTORIAL_SUPERVISION":
+      return ["RETRIAL_APPLICANT", "RETRIAL_RESPONDENT", "THIRD_PARTY"];
+
+    case "COMMERCIAL_ARBITRATION":
+    case "LABOR_ARBITRATION":
+      return ["ARBITRATION_CLAIMANT", "ARBITRATION_RESPONDENT", "THIRD_PARTY"];
+
+    case "ARBITRATION_SET_ASIDE":
+    case "ARBITRATION_ENFORCEMENT_REVIEW":
+      return ["ARBITRATION_CLAIMANT", "ARBITRATION_RESPONDENT"];
+
+    case "ENFORCEMENT":
+    case "ENFORCEMENT_OBJECTION":
+      return ["ENFORCEMENT_APPLICANT", "EXECUTED_PERSON", "THIRD_PARTY"];
+
+    case "INVESTIGATION":
+    case "PROSECUTION_REVIEW":
+    case "DEATH_PENALTY_REVIEW":
+    case "CRIMINAL_ENFORCEMENT":
+    case "COMMUTATION_PAROLE_REVIEW":
+      return [
+        "CRIMINAL_DEFENDANT",
+        "CRIMINAL_VICTIM",
+        "PRIVATE_PROSECUTOR",
+        "CRIMINAL_INCIDENTAL_PLAINTIFF"
+      ];
+
+    case "ADMIN_RECONSIDERATION":
+      return ["ADMIN_RECONSIDERATION_APPLICANT", "ADMIN_RECONSIDERATION_RESPONDENT", "THIRD_PARTY"];
+
+    case "ADMIN_NON_LITIGATION_ENFORCEMENT":
+      return ["ADMIN_PLAINTIFF", "ADMIN_DEFENDANT", "EXECUTED_PERSON"];
+
+    case "NON_LITIGATION_PHASE":
+    case "CUSTOM":
+      return ["NON_LITIGATION_PARTY"];
+
+    default:
+      return Object.keys(litigationStandingLabel) as LitigationStanding[];
+  }
+}

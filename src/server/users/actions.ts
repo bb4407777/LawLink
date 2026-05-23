@@ -69,6 +69,19 @@ export async function listUsers() {
   });
 }
 
+/**
+ * 任意登录用户都可调：拿活跃同事列表，用于收案/案件团队选择。
+ * 默认排除 FINANCE/ADMIN 系统角色（仍可选，做"全部"切换时再开放）。
+ */
+export async function listActiveColleagues() {
+  await requireSession();
+  return prisma.user.findMany({
+    where: { active: true },
+    orderBy: [{ role: "asc" }, { name: "asc" }],
+    select: { id: true, name: true, role: true }
+  });
+}
+
 export async function createUser(input: UserCreateInput) {
   const session = await requireAdmin();
   const data = userCreateSchema.parse(input);

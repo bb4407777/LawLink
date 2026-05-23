@@ -27,7 +27,8 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 export async function uploadDocument(formData: FormData) {
   const session = await requireSession();
 
-  const matterId = formData.get("matterId");
+  const matterIdRaw = formData.get("matterId");
+  const intakeIdRaw = formData.get("intakeId");
   const procedureId = formData.get("procedureId");
   const name = formData.get("name");
   const category = formData.get("category");
@@ -36,7 +37,11 @@ export async function uploadDocument(formData: FormData) {
   const file = formData.get("file");
 
   if (!(file instanceof File)) throw new Error("缺少文件");
-  if (typeof matterId !== "string") throw new Error("matterId 缺失");
+
+  const matterId = typeof matterIdRaw === "string" && matterIdRaw ? matterIdRaw : null;
+  const intakeId = typeof intakeIdRaw === "string" && intakeIdRaw ? intakeIdRaw : null;
+  if (!matterId && !intakeId) throw new Error("matterId 或 intakeId 至少需要一个");
+
   if (typeof name !== "string" || !name.trim()) throw new Error("材料名称必填");
   const parsedCategory = documentCategorySchema.parse(category || "OTHER");
   const tags =
@@ -49,16 +54,28 @@ export async function uploadDocument(formData: FormData) {
     throw new Error(`文件超过 ${MAX_FILE_SIZE / 1024 / 1024}MB 限制`);
   }
 
-  // 校验案件存在
-  const matter = await prisma.matter.findUnique({
-    where: { id: matterId, deletedAt: null },
-    select: { id: true, status: true }
-  });
-  if (!matter) throw new Error("案件不存在");
-  if (matter.status === "ARCHIVED") throw new Error("已归档案件不可上传材料");
+  // 校验归属对象存在
+  if (matterId) {
+    const matter = await prisma.matter.findUnique({
+      where: { id: matterId, deletedAt: null },
+      select: { id: true, status: true }
+    });
+    if (!matter) throw new Error("案件不存在");
+    if (matter.status === "ARCHIVED") throw new Error("已归档案件不可上传材料");
+  }
+  if (intakeId) {
+    const intake = await prisma.intake.findUnique({
+      where: { id: intakeId },
+      select: { id: true, status: true }
+    });
+    if (!intake) throw new Error("收案记录不存在");
+    if (intake.status === "DECLINED") throw new Error("已拒绝的收案不可上传材料");
+  }
 
   const raw = Buffer.from(await file.arrayBuffer());
   const hash = sha256(raw);
+
+  const storageBucket = matterId ? `m_${matterId}` : `i_${intakeId}`;
 
   let path: string;
   let iv: string | null = null;
@@ -67,17 +84,18 @@ export async function uploadDocument(formData: FormData) {
 
   if (encrypted) {
     const enc = encryptBuffer(raw);
-    path = await writeFile(`m_${matterId}`, enc.ciphertext);
+    path = await writeFile(storageBucket, enc.ciphertext);
     iv = enc.iv.toString("base64");
     authTag = enc.authTag.toString("base64");
     algorithm = enc.algorithm;
   } else {
-    path = await writeFile(`m_${matterId}`, raw);
+    path = await writeFile(storageBucket, raw);
   }
 
   const created = await prisma.document.create({
     data: {
       matterId,
+      intakeId,
       procedureId: typeof procedureId === "string" && procedureId ? procedureId : null,
       name,
       category: parsedCategory,
@@ -99,11 +117,11 @@ export async function uploadDocument(formData: FormData) {
     action: "DOCUMENT_UPLOAD",
     targetType: "Document",
     targetId: created.id,
-    detail: { matterId, name, encrypted, size: file.size }
+    detail: { matterId, intakeId, name, encrypted, size: file.size }
   });
 
-  revalidatePath(`/matters/${matterId}`);
-  revalidatePath("/documents");
+  if (matterId) revalidatePath(`/matters/${matterId}`);
+  if (intakeId) revalidatePath(`/intakes/${intakeId}`);
   return { ok: true, id: created.id };
 }
 
@@ -131,11 +149,11 @@ export async function deleteDocument(id: string) {
     action: "DOCUMENT_DELETE",
     targetType: "Document",
     targetId: id,
-    detail: { matterId: doc.matterId, name: doc.name }
+    detail: { matterId: doc.matterId, intakeId: doc.intakeId, name: doc.name }
   });
 
-  revalidatePath(`/matters/${doc.matterId}`);
-  revalidatePath("/documents");
+  if (doc.matterId) revalidatePath(`/matters/${doc.matterId}`);
+  if (doc.intakeId) revalidatePath(`/intakes/${doc.intakeId}`);
   return { ok: true };
 }
 
@@ -155,10 +173,11 @@ export async function hardDeleteDocument(id: string) {
     action: "DOCUMENT_HARD_DELETE",
     targetType: "Document",
     targetId: id,
-    detail: { matterId: doc.matterId, name: doc.name }
+    detail: { matterId: doc.matterId, intakeId: doc.intakeId, name: doc.name }
   });
 
-  revalidatePath(`/matters/${doc.matterId}`);
+  if (doc.matterId) revalidatePath(`/matters/${doc.matterId}`);
+  if (doc.intakeId) revalidatePath(`/intakes/${doc.intakeId}`);
   return { ok: true };
 }
 

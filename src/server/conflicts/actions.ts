@@ -7,19 +7,26 @@ import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
 import { runConflictCheck, type QueryItem } from "./algorithm";
 
-const queryItemSchema = z.object({
-  role: z.enum([
-    "CLIENT_PARTY",
-    "OPPOSING_PARTY",
-    "THIRD_PARTY",
-    "CO_LITIGANT",
-    "AGENT",
-    "WITNESS",
-    "OTHER"
-  ]),
-  name: z.string().min(1).max(120),
-  idNumber: z.string().max(50).optional().or(z.literal(""))
-});
+const queryItemSchema = z
+  .object({
+    // v0.4: 角色可选（顶栏快查不需要），server 端默认 OPPOSING_PARTY
+    role: z
+      .enum([
+        "CLIENT_PARTY",
+        "OPPOSING_PARTY",
+        "THIRD_PARTY",
+        "CO_LITIGANT",
+        "AGENT",
+        "WITNESS",
+        "OTHER"
+      ])
+      .optional(),
+    name: z.string().max(120).optional().or(z.literal("")),
+    idNumber: z.string().max(50).optional().or(z.literal(""))
+  })
+  .refine((q) => (q.name && q.name.trim()) || (q.idNumber && q.idNumber.trim()), {
+    message: "姓名或证件号至少填写一项"
+  });
 
 const runCheckSchema = z.object({
   intakeId: z.string().cuid().optional(),
@@ -34,10 +41,10 @@ export async function runCheckAndSave(input: z.infer<typeof runCheckSchema>) {
   const session = await requireSession();
   const data = runCheckSchema.parse(input);
 
-  // 清理 query
+  // 清理 query（v0.4: 允许 name 为空，由 idNumber 兜底；role 缺省视为 OPPOSING_PARTY）
   const queries: QueryItem[] = data.queries.map((q) => ({
-    role: q.role,
-    name: q.name.trim(),
+    role: q.role ?? "OPPOSING_PARTY",
+    name: (q.name ?? "").trim(),
     idNumber: q.idNumber?.trim() || undefined
   }));
 

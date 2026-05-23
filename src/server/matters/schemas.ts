@@ -21,12 +21,24 @@ export const litigationStandingSchema = z.enum([
   "PLAINTIFF",
   "DEFENDANT",
   "THIRD_PARTY",
+  "COUNTERCLAIM_PLAINTIFF",
+  "COUNTERCLAIM_DEFENDANT",
+  "APPELLANT",
+  "APPELLEE",
+  "RETRIAL_APPLICANT",
+  "RETRIAL_RESPONDENT",
+  "ENFORCEMENT_APPLICANT",
+  "EXECUTED_PERSON",
   "CRIMINAL_DEFENDANT",
   "CRIMINAL_VICTIM",
   "PRIVATE_PROSECUTOR",
   "CRIMINAL_INCIDENTAL_PLAINTIFF",
   "ARBITRATION_CLAIMANT",
   "ARBITRATION_RESPONDENT",
+  "ADMIN_PLAINTIFF",
+  "ADMIN_DEFENDANT",
+  "ADMIN_RECONSIDERATION_APPLICANT",
+  "ADMIN_RECONSIDERATION_RESPONDENT",
   "NON_LITIGATION_PARTY"
 ]);
 
@@ -67,6 +79,8 @@ export const partyRoleSchema = z.enum([
 
 export const partyInputSchema = z.object({
   role: partyRoleSchema,
+  // v0.5: 具体诉讼地位（按首程序联动）
+  standing: litigationStandingSchema.optional(),
   ordinal: z.number().int().min(1).default(1),
   name: z.string().min(1, "当事人姓名/名称必填").max(120),
   idNumber: z.string().max(50).optional().or(z.literal("")),
@@ -115,6 +129,8 @@ export const matterListQuerySchema = z.object({
   search: z.string().optional(),
   category: matterCategorySchema.optional(),
   status: matterStatusSchema.optional(),
+  statusIn: z.array(matterStatusSchema).optional(),
+  statusNotIn: z.array(matterStatusSchema).optional(),
   ownerId: z.string().cuid().optional(),
   clientId: z.string().cuid().optional(),
   page: z.coerce.number().int().min(1).default(1),

@@ -57,13 +57,45 @@ enum LitigationStanding {
   PLAINTIFF
   DEFENDANT
   THIRD_PARTY
+  COUNTERCLAIM_PLAINTIFF
+  COUNTERCLAIM_DEFENDANT
+  // v0.5: 二审 / 再审 / 执行
+  APPELLANT
+  APPELLEE
+  RETRIAL_APPLICANT
+  RETRIAL_RESPONDENT
+  ENFORCEMENT_APPLICANT
+  EXECUTED_PERSON
+  // 刑事
   CRIMINAL_DEFENDANT
   CRIMINAL_VICTIM
   PRIVATE_PROSECUTOR
   CRIMINAL_INCIDENTAL_PLAINTIFF
+  // 仲裁
   ARBITRATION_CLAIMANT
   ARBITRATION_RESPONDENT
+  // 行政
+  ADMIN_PLAINTIFF
+  ADMIN_DEFENDANT
+  ADMIN_RECONSIDERATION_APPLICANT
+  ADMIN_RECONSIDERATION_RESPONDENT
+  // 非诉
   NON_LITIGATION_PARTY
+}
+
+enum FeeType {
+  LUMP_SUM            // 一次性
+  INSTALLMENT         // 分期支付
+  CONTINGENCY_FULL    // 风险代理：纯后付
+  CONTINGENCY_PARTIAL // 风险代理：部分后付
+  HOURLY              // 按小时计费
+}
+
+enum InvoiceRequestStatus {
+  PENDING    // 律师已申请、待财务处理
+  APPROVED   // 财务已批准、待开票
+  ISSUED     // 已开具（含电子发票）
+  REJECTED   // 被拒
 }
 
 enum ProcedureType {
@@ -209,17 +241,21 @@ model User {
   active       Boolean   @default(true)
   lastLoginAt  DateTime?
 
-  ownedMatters          Matter[]        @relation("MatterOwner")
+  ownedMatters          Matter[]         @relation("MatterOwner")
   memberships           MatterMember[]
   commissionPlans       CommissionPlan[]
-  feeEntriesBeneficiary FeeEntry[]      @relation("FeeBeneficiary")
-  feeEntriesRecorded    FeeEntry[]      @relation("FeeRecorder")
-  authoredNotes         Note[]          @relation("NoteAuthor")
-  uploadedDocuments     Document[]      @relation("DocumentUploader")
+  feeEntriesBeneficiary FeeEntry[]       @relation("FeeBeneficiary")
+  feeEntriesRecorded    FeeEntry[]       @relation("FeeRecorder")
+  authoredNotes         Note[]           @relation("NoteAuthor")
+  uploadedDocuments     Document[]       @relation("DocumentUploader")
   auditLogs             AuditLog[]
-  conflictDecisions     ConflictCheck[] @relation("ConflictDecidedBy")
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  conflictDecisions     ConflictCheck[]  @relation("ConflictDecidedBy")
+  // v0.5
+  ownedIntakes          Intake[]         @relation("IntakeOwner")
+  invoiceRequests       InvoiceRequest[] @relation("InvoiceRequester")
+  invoiceProcessing     InvoiceRequest[] @relation("InvoiceProcessor")
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
 }
 
 // ============================================================
@@ -308,16 +344,39 @@ model Intake {
   cause          CauseOfAction?  @relation(fields: [causeId], references: [id])
   causeFreeText  String?
   description    String?
-  source         String?
   status         IntakeStatus    @default(INTAKE)
   receivedAt     DateTime        @default(now())
   declinedReason String?
 
+  // v0.5: 客户 + 联系人
   clientId       String?
   client         Client?         @relation(fields: [clientId], references: [id])
+  clientType     ClientType?     // 提交时自动建档用，转化后随 Client 表
+  contactName    String?
+  contactPhone   String?
+
+  // v0.5: 程序 + 诉讼地位 + 争议解决机构 + 标的
+  firstProcedureType ProcedureType?
+  firstAgency        String?            // 法院/仲裁机构/侦查机关 名称
+  ourStanding        LitigationStanding?
+  claimAmount        Decimal?           @db.Decimal(14, 2)
+  claimDescription   String?            // 非金钱标的描述
+
+  // v0.5: 律师费
+  feeType      FeeType?
+  feeAmount    Decimal? @db.Decimal(14, 2)
+  feeSchedule  String?  // 分期 / 后付节点 自由文本
+  feeNote      String?
+
+  // v0.5: 主办律师 + 共同律师（转化时生成 MatterMember）
+  ownerUserId  String?
+  ownerUser    User?    @relation("IntakeOwner", fields: [ownerUserId], references: [id])
+  coUserIds    String[] @default([])
+
   parties        Party[]
   conflictChecks ConflictCheck[]
   matter         Matter?
+  documents      Document[]
 
   createdById    String
   createdAt      DateTime        @default(now())
@@ -325,6 +384,7 @@ model Intake {
 
   @@index([status, receivedAt])
   @@index([causeId])
+  @@index([ownerUserId])
 }
 
 // ============================================================
@@ -376,6 +436,7 @@ model Matter {
   feeEntries              FeeEntry[]
   commissionPlans         CommissionPlan[]
   archiveRecords          ArchiveRecord[]
+  invoiceRequests         InvoiceRequest[]
 
   deletedAt               DateTime?
   createdAt               DateTime            @default(now())
@@ -532,21 +593,23 @@ model Deadline {
 // ============================================================
 
 model Party {
-  id        String    @id @default(cuid())
+  id        String              @id @default(cuid())
   intakeId  String?
-  intake    Intake?   @relation(fields: [intakeId], references: [id], onDelete: Cascade)
+  intake    Intake?             @relation(fields: [intakeId], references: [id], onDelete: Cascade)
   matterId  String?
-  matter    Matter?   @relation(fields: [matterId], references: [id], onDelete: Cascade)
+  matter    Matter?             @relation(fields: [matterId], references: [id], onDelete: Cascade)
   role      PartyRole
-  ordinal   Int       @default(1)
+  // v0.5: 具体诉讼地位（依首程序联动），role 保留作粗粒度
+  standing  LitigationStanding?
+  ordinal   Int                 @default(1)
   name      String
   idNumber  String?
   phone     String?
   address   String?
   legalRep  String?
   notes     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
 
   @@index([matterId, role, ordinal])
   @@index([name])
@@ -628,8 +691,11 @@ model Note {
 
 model Document {
   id           String           @id @default(cuid())
-  matterId     String
-  matter       Matter           @relation(fields: [matterId], references: [id], onDelete: Cascade)
+  // v0.4: matterId 可空（收案阶段挂在 Intake 上），转 Matter 时回填
+  matterId     String?
+  matter       Matter?          @relation(fields: [matterId], references: [id], onDelete: Cascade)
+  intakeId     String?
+  intake       Intake?          @relation(fields: [intakeId], references: [id], onDelete: Cascade)
   procedureId  String?
   procedure    MatterProcedure? @relation(fields: [procedureId], references: [id])
   name         String
@@ -655,9 +721,51 @@ model Document {
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
+  // v0.5: 发票工作流附件反向
+  invoiceAsContract InvoiceRequest? @relation("InvoiceContractScan")
+  invoiceAsFile     InvoiceRequest? @relation("InvoiceFile")
+
   @@index([matterId, category])
+  @@index([intakeId])
   @@index([procedureId])
   @@index([familyId])
+}
+
+// ============================================================
+// 发票申请工作流（v0.5）
+// 律师在案件详情提交申请 → 财务审核 → 上传扫描件合同 + 电子发票
+// ============================================================
+
+model InvoiceRequest {
+  id              String               @id @default(cuid())
+  matterId        String
+  matter          Matter               @relation(fields: [matterId], references: [id], onDelete: Cascade)
+  amount          Decimal              @db.Decimal(14, 2)
+  title           String?              // 客户称谓 / 备注
+  status          InvoiceRequestStatus @default(PENDING)
+  requestNote     String?
+
+  requestedById   String
+  requestedBy     User                 @relation("InvoiceRequester", fields: [requestedById], references: [id])
+  requestedAt     DateTime             @default(now())
+
+  processedById   String?
+  processedBy     User?                @relation("InvoiceProcessor", fields: [processedById], references: [id])
+  processedAt     DateTime?
+  processNote     String?
+
+  // 财务上传：扫描件合同 + 电子发票文件（均走 Document）
+  contractScanId  String?              @unique
+  contractScan    Document?            @relation("InvoiceContractScan", fields: [contractScanId], references: [id])
+  invoiceFileId   String?              @unique
+  invoiceFile     Document?            @relation("InvoiceFile", fields: [invoiceFileId], references: [id])
+
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([matterId, status])
+  @@index([status, requestedAt])
+  @@index([requestedById])
 }
 
 // ============================================================

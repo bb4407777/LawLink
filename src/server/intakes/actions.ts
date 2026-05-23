@@ -22,6 +22,24 @@ function emptyToNull<T extends Record<string, unknown>>(obj: T): T {
   return out as T;
 }
 
+function requireApprover(role: string) {
+  if (role !== "ADMIN" && role !== "PRINCIPAL_LAWYER") {
+    throw new Error("仅管理员或主任律师可审批收案");
+  }
+}
+
+/** 按 {委托方} 与 {对方} {案由}纠纷 自动生成标题 */
+function generateTitle(
+  clientName: string | null,
+  opposingNames: string[],
+  causeName: string | null
+): string {
+  const left = clientName || "待补充委托方";
+  const right = opposingNames.length > 0 ? opposingNames.join("、") : "待补充对方";
+  const cause = causeName ? `${causeName}纠纷` : "案件";
+  return `${left} 与 ${right} ${cause}`;
+}
+
 export async function listIntakes(input: Partial<IntakeListQuery> = {}) {
   await requireSession();
   const query = intakeListQuerySchema.parse(input);
@@ -70,12 +88,18 @@ export async function getIntakeById(id: string) {
     include: {
       client: true,
       cause: true,
+      ownerUser: { select: { id: true, name: true, role: true } },
       parties: { orderBy: [{ role: "asc" }, { ordinal: "asc" }] },
       conflictChecks: {
         orderBy: { checkedAt: "desc" },
         include: { hits: true, decidedBy: { select: { id: true, name: true } } }
       },
-      matter: { select: { id: true, internalCode: true, title: true } }
+      matter: { select: { id: true, internalCode: true, title: true } },
+      documents: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, name: true, category: true, size: true, createdAt: true }
+      }
     }
   });
   if (intake) {
@@ -93,20 +117,122 @@ export async function createIntake(input: IntakeCreateInput) {
   const session = await requireSession();
   const data = intakeCreateSchema.parse(input);
 
+  // ----- 解析客户：已选 / 自由输入新建 -----
+  let resolvedClientId: string | null = data.clientId || null;
+  let resolvedClientName: string | null = null;
+
+  if (!resolvedClientId && data.clientName && data.clientName.trim()) {
+    const name = data.clientName.trim();
+    const newClient = await prisma.client.create({
+      data: {
+        name,
+        type: data.clientType ?? "INDIVIDUAL",
+        phone: data.contactPhone || null,
+        // 同步建一个主联系人
+        contacts:
+          data.contactName?.trim() || data.contactPhone?.trim()
+            ? {
+                create: {
+                  name: (data.contactName || name).trim(),
+                  phone: data.contactPhone?.trim() || null,
+                  isPrimary: true
+                }
+              }
+            : undefined
+      }
+    });
+    resolvedClientId = newClient.id;
+    resolvedClientName = name;
+    await audit({
+      userId: session.user.id,
+      action: "CLIENT_AUTO_CREATE",
+      targetType: "Client",
+      targetId: newClient.id,
+      detail: { name, type: newClient.type, source: "intake" }
+    });
+  } else if (resolvedClientId) {
+    const c = await prisma.client.findUnique({
+      where: { id: resolvedClientId },
+      select: { name: true }
+    });
+    resolvedClientName = c?.name ?? null;
+
+    // 已有客户也补一条联系人（如果填了且现有不存在同名联系人）
+    if (data.contactName?.trim() || data.contactPhone?.trim()) {
+      const existing = await prisma.contact.findFirst({
+        where: {
+          clientId: resolvedClientId,
+          name: (data.contactName || resolvedClientName || "").trim() || undefined
+        }
+      });
+      if (!existing) {
+        await prisma.contact.create({
+          data: {
+            clientId: resolvedClientId,
+            name: (data.contactName || resolvedClientName || "联系人").trim(),
+            phone: data.contactPhone?.trim() || null,
+            isPrimary: false
+          }
+        });
+      }
+    }
+  }
+
+  // ----- 案由名（用于自动 title）-----
+  let causeName: string | null = data.causeFreeText || null;
+  if (data.causeId) {
+    const cause = await prisma.causeOfAction.findUnique({
+      where: { id: data.causeId },
+      select: { name: true }
+    });
+    causeName = cause?.name ?? causeName;
+  }
+
+  const opposingNames = data.parties
+    .filter((p) => p.role === "OPPOSING_PARTY")
+    .map((p) => p.name)
+    .filter(Boolean);
+
+  const finalTitle =
+    data.title && data.title.trim()
+      ? data.title.trim()
+      : generateTitle(resolvedClientName, opposingNames, causeName);
+
   const created = await prisma.intake.create({
     data: {
-      title: data.title,
+      title: finalTitle,
       category: data.category,
       causeId: data.causeId || null,
       causeFreeText: data.causeFreeText || null,
       description: data.description || null,
-      source: data.source || null,
-      clientId: data.clientId || null,
+      status: "PENDING_CONFIRMATION",
+      receivedAt: data.receivedAt ?? new Date(),
+
+      clientId: resolvedClientId,
+      clientType: data.clientType ?? null,
+      contactName: data.contactName?.trim() || null,
+      contactPhone: data.contactPhone?.trim() || null,
+
+      firstProcedureType: data.firstProcedureType ?? null,
+      firstAgency: data.firstAgency?.trim() || null,
+      ourStanding: data.ourStanding ?? null,
+      claimAmount: data.claimAmount ?? null,
+      claimDescription: data.claimDescription?.trim() || null,
+
+      feeType: data.feeType ?? null,
+      feeAmount: data.feeAmount ?? null,
+      feeSchedule: data.feeSchedule?.trim() || null,
+      feeNote: data.feeNote?.trim() || null,
+
+      ownerUserId: data.ownerUserId || session.user.id,
+      coUserIds: data.coUserIds,
+
       createdById: session.user.id,
       parties: {
         create: data.parties.map((p) =>
           emptyToNull({
             role: p.role,
+            standing: p.standing ?? null,
             ordinal: p.ordinal,
             name: p.name,
             idNumber: p.idNumber,
@@ -125,15 +251,22 @@ export async function createIntake(input: IntakeCreateInput) {
     action: "INTAKE_CREATE",
     targetType: "Intake",
     targetId: created.id,
-    detail: { title: created.title, category: created.category }
+    detail: {
+      title: created.title,
+      category: created.category,
+      autoTitle: !data.title,
+      autoClient: !!resolvedClientName && !data.clientId
+    }
   });
 
   revalidatePath("/intakes");
-  return { ok: true, id: created.id };
+  revalidatePath("/matters");
+  return { ok: true, id: created.id, clientId: resolvedClientId };
 }
 
 export async function declineIntake(input: DeclineIntakeInput) {
   const session = await requireSession();
+  requireApprover(session.user.role);
   const data = declineIntakeSchema.parse(input);
 
   await prisma.intake.update({
@@ -154,59 +287,68 @@ export async function declineIntake(input: DeclineIntakeInput) {
 
   revalidatePath("/intakes");
   revalidatePath(`/intakes/${data.id}`);
+  revalidatePath("/matters");
   return { ok: true };
 }
 
-/**
- * 把 Intake 转为正式 Matter。
- * - 复制 Intake 的 client / cause / parties / category 到 Matter
- * - 占用一个 internalCode 流水
- * - 创建一个默认首程序（FIRST_INSTANCE / NON_LITIGATION_PHASE 等）
- * - 把 Intake 状态置 CONVERTED 并关联 matterId
- *
- * 实际新建案件还需要补充诉讼地位等，由前端跳转新建案件抽屉填写。
- * 这里提供另一条路径：快速转化（用 Intake 现有信息）。
- */
+/** 转 Matter：把 intake 上的全部字段铺到 Matter / 首程序 / Billing / MatterMember / Document */
 export async function convertIntakeToMatter(intakeId: string) {
   const session = await requireSession();
+  requireApprover(session.user.role);
   const intake = await prisma.intake.findUnique({
     where: { id: intakeId },
-    include: { parties: true }
+    include: {
+      parties: true,
+      documents: { select: { id: true } }
+    }
   });
   if (!intake) throw new Error("Intake 不存在");
   if (intake.status === "CONVERTED") throw new Error("此 Intake 已转化");
 
-  // 用 internalCode 生成器
   const { generateInternalCode } = await import("@/server/matters/code-generator");
   const internalCode = await generateInternalCode(intake.category);
 
-  // 推断首程序类型
+  // 首程序类型：优先用 intake 选的，缺失按案件类别推断
   const firstProcedureType =
-    intake.category === "CIVIL_COMMERCIAL" ||
+    intake.firstProcedureType ??
+    (intake.category === "CIVIL_COMMERCIAL" ||
     intake.category === "CRIMINAL" ||
     intake.category === "ADMINISTRATIVE"
       ? "FIRST_INSTANCE"
-      : "NON_LITIGATION_PHASE";
+      : "NON_LITIGATION_PHASE");
 
   const matter = await prisma.$transaction(async (tx) => {
+    const ownerId = intake.ownerUserId ?? session.user.id;
+
     const m = await tx.matter.create({
       data: {
         internalCode,
         title: intake.title,
         category: intake.category,
-        ownerId: session.user.id,
+        ownerId,
         causeId: intake.causeId,
         causeFreeText: intake.causeFreeText,
         primaryClientId: intake.clientId,
         intakeId: intake.id,
         intakeDate: intake.receivedAt,
-        members: { create: { userId: session.user.id, role: "LEAD" } },
+        ourStanding: intake.ourStanding,
+        claimAmount: intake.claimAmount,
+        // 主办自动作为 LEAD；coUserIds 作为 CO_LEAD
+        members: {
+          create: [
+            { userId: ownerId, role: "LEAD" },
+            ...intake.coUserIds
+              .filter((uid) => uid !== ownerId)
+              .map((uid) => ({ userId: uid, role: "CO_LEAD" as const }))
+          ]
+        },
         clientLinks: intake.clientId
           ? { create: { clientId: intake.clientId, isPrimary: true, label: "主要委托方" } }
           : undefined,
         parties: {
           create: intake.parties.map((p) => ({
             role: p.role,
+            standing: p.standing,
             ordinal: p.ordinal,
             name: p.name,
             idNumber: p.idNumber,
@@ -221,11 +363,40 @@ export async function convertIntakeToMatter(intakeId: string) {
             type: firstProcedureType,
             engagement: "ENGAGED",
             order: 1,
-            status: "IN_PROGRESS"
+            status: "IN_PROGRESS",
+            handlingAgency: intake.firstAgency
           }
         }
       }
     });
+
+    // 律师费 → Billing
+    if (intake.feeAmount && intake.feeType) {
+      const feeTypeLabel: Record<string, string> = {
+        LUMP_SUM: "一次性",
+        INSTALLMENT: "分期支付",
+        CONTINGENCY_FULL: "风险代理(纯后付)",
+        CONTINGENCY_PARTIAL: "风险代理(部分后付)",
+        HOURLY: "按小时计费"
+      };
+      await tx.billing.create({
+        data: {
+          matterId: m.id,
+          title: `委托代理合同 - ${feeTypeLabel[intake.feeType] ?? intake.feeType}`,
+          contractAmount: intake.feeAmount,
+          schedule: intake.feeSchedule,
+          status: "ACTIVE"
+        }
+      });
+    }
+
+    // 把 Intake 上传的合同回填 matterId（保留 intakeId 溯源）
+    if (intake.documents.length > 0) {
+      await tx.document.updateMany({
+        where: { intakeId: intake.id },
+        data: { matterId: m.id }
+      });
+    }
 
     await tx.intake.update({
       where: { id: intake.id },

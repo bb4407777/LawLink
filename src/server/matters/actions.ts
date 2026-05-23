@@ -29,6 +29,8 @@ export async function listMatters(input: Partial<MatterListQuery> = {}) {
     deletedAt: null,
     ...(query.category ? { category: query.category } : {}),
     ...(query.status ? { status: query.status } : {}),
+    ...(query.statusIn ? { status: { in: query.statusIn } } : {}),
+    ...(query.statusNotIn ? { status: { notIn: query.statusNotIn } } : {}),
     ...(query.ownerId ? { ownerId: query.ownerId } : {}),
     ...(query.clientId ? { primaryClientId: query.clientId } : {}),
     ...(query.search
@@ -209,6 +211,77 @@ export async function createMatter(input: MatterCreateInput) {
 
   revalidatePath("/matters");
   return { ok: true, id: created.id, internalCode: created.internalCode };
+}
+
+/**
+ * v0.5: 更新案件团队。
+ * - 仅 ADMIN / PRINCIPAL_LAWYER / 当前 LEAD 可操作
+ * - ownerId 改变时同步替换 MatterMember 中的 LEAD
+ * - coLeadIds 和 assistantIds 覆盖式更新对应角色（不影响主办自动 LEAD）
+ */
+export async function updateMatterTeam(input: {
+  matterId: string;
+  ownerId: string;
+  coLeadIds: string[];
+  assistantIds: string[];
+}) {
+  const session = await requireSession();
+  const matter = await prisma.matter.findUnique({
+    where: { id: input.matterId, deletedAt: null },
+    select: { id: true, ownerId: true }
+  });
+  if (!matter) throw new Error("案件不存在");
+
+  const canEdit =
+    session.user.role === "ADMIN" ||
+    session.user.role === "PRINCIPAL_LAWYER" ||
+    matter.ownerId === session.user.id;
+  if (!canEdit) throw new Error("无权修改团队");
+
+  // 校验：coLeadIds / assistantIds 不能与 ownerId 重叠
+  const co = input.coLeadIds.filter((id) => id !== input.ownerId);
+  const ass = input.assistantIds.filter(
+    (id) => id !== input.ownerId && !co.includes(id)
+  );
+
+  await prisma.$transaction(async (tx) => {
+    // 更新 Matter.ownerId
+    if (matter.ownerId !== input.ownerId) {
+      await tx.matter.update({
+        where: { id: input.matterId },
+        data: { ownerId: input.ownerId }
+      });
+    }
+
+    // 重建 MatterMember：先删除全部，再按新结构插入
+    await tx.matterMember.deleteMany({ where: { matterId: input.matterId } });
+
+    const rows = [
+      { matterId: input.matterId, userId: input.ownerId, role: "LEAD" as const },
+      ...co.map((uid) => ({
+        matterId: input.matterId,
+        userId: uid,
+        role: "CO_LEAD" as const
+      })),
+      ...ass.map((uid) => ({
+        matterId: input.matterId,
+        userId: uid,
+        role: "ASSISTANT" as const
+      }))
+    ];
+    await tx.matterMember.createMany({ data: rows, skipDuplicates: true });
+  });
+
+  await audit({
+    userId: session.user.id,
+    action: "MATTER_TEAM_UPDATE",
+    targetType: "Matter",
+    targetId: input.matterId,
+    detail: { ownerId: input.ownerId, coLeads: co.length, assistants: ass.length }
+  });
+
+  revalidatePath(`/matters/${input.matterId}`);
+  return { ok: true };
 }
 
 export async function softDeleteMatter(id: string) {
