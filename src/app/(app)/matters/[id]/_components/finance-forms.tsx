@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2, Paperclip, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,20 +17,14 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter
-} from "@/components/ui/sheet";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter
 } from "@/components/ui/dialog";
+import { RadioChips } from "@/components/ui/radio-chips";
 import {
   billingCreateSchema,
   feeEntryCreateSchema,
@@ -42,6 +36,7 @@ import {
   createFeeEntry,
   setCommissionPlan
 } from "@/server/finance/actions";
+import { uploadDocument } from "@/server/documents/actions";
 import { userRoleLabel } from "@/lib/enums";
 
 // ============ AddBillingSheet ============
@@ -56,6 +51,7 @@ export function AddBillingSheet({
   matterId: string;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [contractFile, setContractFile] = useState<File | null>(null);
   const {
     register,
     handleSubmit,
@@ -78,8 +74,21 @@ export function AddBillingSheet({
     startTransition(async () => {
       try {
         await createBilling(values);
-        toast.success("合同已创建");
+        if (contractFile) {
+          const fd = new FormData();
+          fd.set("matterId", matterId);
+          fd.set("name", contractFile.name);
+          fd.set("category", "CONTRACT");
+          fd.set("encrypted", "true");
+          fd.set("tags", `合同,${values.title}`);
+          fd.set("file", contractFile);
+          await uploadDocument(fd);
+          toast.success("合同已创建，附件已加密入库");
+        } else {
+          toast.success("合同已创建");
+        }
         reset();
+        setContractFile(null);
         onOpenChange(false);
       } catch (err) {
         toast.error("失败", { description: err instanceof Error ? err.message : "" });
@@ -88,14 +97,14 @@ export function AddBillingSheet({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full max-w-md flex-col gap-0 p-0">
-        <SheetHeader className="border-b border-border bg-background/60 px-6 py-4 backdrop-blur">
-          <SheetTitle>新增合同</SheetTitle>
-          <SheetDescription className="text-xs">
-            一个案件可以有多份合同（如分阶段委托）
-          </SheetDescription>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[88vh] w-[92vw] max-w-2xl flex-col gap-0 p-0">
+        <DialogHeader className="border-b border-hairline px-6 py-4">
+          <DialogTitle>新增合同</DialogTitle>
+          <DialogDescription className="text-xs">
+            一个案件可以有多份合同（如分阶段委托）。可同时上传合同扫描件，加密入库后归到本案材料库。
+          </DialogDescription>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 flex-col">
           <div className="flex-1 space-y-3 overflow-y-auto px-6 py-5">
@@ -116,21 +125,16 @@ export function AddBillingSheet({
             </Field>
 
             <Field label="状态">
-              <Select
+              <RadioChips
+                size="sm"
+                items={[
+                  { value: "DRAFT", label: "草稿" },
+                  { value: "ACTIVE", label: "生效中" },
+                  { value: "CLOSED", label: "已结清" }
+                ]}
                 value={watch("status")}
-                onValueChange={(v) =>
-                  setValue("status", v as BillingCreateInput["status"])
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DRAFT">草稿</SelectItem>
-                  <SelectItem value="ACTIVE">生效中</SelectItem>
-                  <SelectItem value="CLOSED">已结清</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(v) => setValue("status", v as BillingCreateInput["status"])}
+              />
             </Field>
 
             <Field label="签订日期">
@@ -139,14 +143,37 @@ export function AddBillingSheet({
 
             <Field label="阶段付款约定">
               <Textarea
-                rows={4}
+                rows={3}
                 placeholder="如：签约时收 30%，立案时收 30%，判决生效后收 40%"
                 {...register("schedule")}
               />
             </Field>
+
+            <Field label="合同附件（可选）">
+              <label className="flex cursor-pointer items-center gap-2 rounded border border-dashed border-hairline px-3 py-3 text-[12px] text-muted-foreground hover:bg-muted/30">
+                <Paperclip className="h-3.5 w-3.5" />
+                {contractFile ? (
+                  <span className="flex items-center gap-1 text-foreground">
+                    <FileText className="h-3 w-3" />
+                    {contractFile.name}
+                    <span className="ml-1 text-[10px] text-muted-foreground">
+                      ({(contractFile.size / 1024).toFixed(0)} KB)
+                    </span>
+                  </span>
+                ) : (
+                  "选择 PDF / docx 文件，提交时自动加密入库"
+                )}
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={(e) => setContractFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+            </Field>
           </div>
 
-          <SheetFooter className="border-t border-border bg-background/60 px-6 py-4 backdrop-blur">
+          <DialogFooter className="border-t border-hairline px-6 py-4">
             <Button
               type="button"
               variant="outline"
@@ -159,10 +186,10 @@ export function AddBillingSheet({
               {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               创建
             </Button>
-          </SheetFooter>
+          </DialogFooter>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -221,37 +248,26 @@ export function AddFeeEntrySheet({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full max-w-md flex-col gap-0 p-0">
-        <SheetHeader className="border-b border-border bg-background/60 px-6 py-4 backdrop-blur">
-          <SheetTitle>新增收付记录</SheetTitle>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[88vh] w-[92vw] max-w-2xl flex-col gap-0 p-0">
+        <DialogHeader className="border-b border-hairline px-6 py-4">
+          <DialogTitle>新增收付记录</DialogTitle>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 flex-col">
           <div className="flex-1 space-y-3 overflow-y-auto px-6 py-5">
             <Field label="类型" required>
-              <div className="grid grid-cols-4 gap-1.5">
-                {(["RECEIVABLE", "RECEIVED", "REFUND", "COST"] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setValue("type", t)}
-                    className={`rounded-md border px-2 py-1.5 text-xs transition-colors ${
-                      type === t
-                        ? "border-primary bg-primary/15 text-primary"
-                        : "border-border bg-background/40 text-muted-foreground hover:border-input"
-                    }`}
-                  >
-                    {t === "RECEIVABLE"
-                      ? "应收"
-                      : t === "RECEIVED"
-                        ? "实收"
-                        : t === "REFUND"
-                          ? "退款"
-                          : "成本"}
-                  </button>
-                ))}
-              </div>
+              <RadioChips
+                size="sm"
+                items={[
+                  { value: "RECEIVABLE", label: "应收" },
+                  { value: "RECEIVED", label: "实收", accent: "#16a34a" },
+                  { value: "REFUND", label: "退款", accent: "#dc2626" },
+                  { value: "COST", label: "成本" }
+                ]}
+                value={type}
+                onChange={(v) => setValue("type", v as FeeEntryCreateInput["type"])}
+              />
             </Field>
 
             <Field label="金额（元）" required error={errors.amount?.message}>
@@ -310,7 +326,7 @@ export function AddFeeEntrySheet({
             </Field>
           </div>
 
-          <SheetFooter className="border-t border-border bg-background/60 px-6 py-4 backdrop-blur">
+          <DialogFooter className="border-t border-hairline px-6 py-4">
             <Button
               type="button"
               variant="outline"
@@ -323,10 +339,10 @@ export function AddFeeEntrySheet({
               {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {type === "RECEIVED" ? "记录实收（自动分成）" : "保存"}
             </Button>
-          </SheetFooter>
+          </DialogFooter>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 
