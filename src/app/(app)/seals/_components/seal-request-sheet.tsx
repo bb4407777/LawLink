@@ -1,0 +1,303 @@
+"use client";
+
+import { useState, useTransition, useEffect } from "react";
+import { FileText, Loader2, Paperclip, Link2 } from "lucide-react";
+import { toast } from "sonner";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import { createSealRequest } from "@/server/seals/actions";
+import {
+  type SealTypeConfigRow,
+  type MatterOption,
+  SEAL_TYPE_CN
+} from "./seal-types";
+
+export function SealRequestSheet({
+  open,
+  onOpenChange,
+  configs,
+  matters,
+  preset
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  configs: SealTypeConfigRow[];
+  matters: MatterOption[];
+  preset: {
+    draftDocId?: string;
+    matterId?: string;
+    documentTitle?: string;
+  } | null;
+}) {
+  const [sealType, setSealType] = useState<string>("");
+  const [matterId, setMatterId] = useState<string>("");
+  const [purpose, setPurpose] = useState("");
+  const [documentTitle, setDocumentTitle] = useState("");
+  const [pageCount, setPageCount] = useState(1);
+  const [crossPage, setCrossPage] = useState(false);
+  const [copies, setCopies] = useState(1);
+  const [urgency, setUrgency] = useState<"NORMAL" | "URGENT">("NORMAL");
+  const [requestNote, setRequestNote] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  // 卷宗联动预填
+  useEffect(() => {
+    if (preset?.matterId) setMatterId(preset.matterId);
+    if (preset?.documentTitle) setDocumentTitle(preset.documentTitle);
+  }, [preset]);
+
+  const reset = () => {
+    setSealType("");
+    setMatterId("");
+    setPurpose("");
+    setDocumentTitle("");
+    setPageCount(1);
+    setCrossPage(false);
+    setCopies(1);
+    setUrgency("NORMAL");
+    setRequestNote("");
+    setFile(null);
+  };
+
+  const enabledConfigs = configs.filter((c) => c.enabled);
+  const hasExisting = !!preset?.draftDocId;
+
+  const submit = () => {
+    if (!sealType) {
+      toast.error("请选择章种类");
+      return;
+    }
+    if (!purpose.trim()) {
+      toast.error("请填写用章事由");
+      return;
+    }
+    if (!documentTitle.trim()) {
+      toast.error("请填写文件标题");
+      return;
+    }
+    if (!hasExisting && !file) {
+      toast.error("请上传待盖章稿");
+      return;
+    }
+
+    const fd = new FormData();
+    fd.set("sealType", sealType);
+    if (matterId) fd.set("matterId", matterId);
+    fd.set("purpose", purpose.trim());
+    fd.set("documentTitle", documentTitle.trim());
+    fd.set("pageCount", String(pageCount));
+    fd.set("requireCrossPageSeal", String(crossPage));
+    fd.set("copies", String(copies));
+    fd.set("urgency", urgency);
+    fd.set("requestNote", requestNote.trim());
+    if (hasExisting && preset?.draftDocId) {
+      fd.set("existingDraftDocId", preset.draftDocId);
+    } else if (file) {
+      fd.set("draftDoc", file);
+    }
+
+    startTransition(async () => {
+      try {
+        const res = await createSealRequest(fd);
+        toast.success(`已提交 ${res.code}`);
+        reset();
+        onOpenChange(false);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "提交失败");
+      }
+    });
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>新建用章申请</SheetTitle>
+        </SheetHeader>
+
+        <div className="mt-4 space-y-4">
+          {/* 联动提示 */}
+          {hasExisting && (
+            <div
+              className="ll-surface flex items-start gap-2 rounded p-2.5 text-[12px]"
+              style={{ background: "rgb(96 165 250 / 0.08)" }}
+            >
+              <Link2 className="mt-0.5 h-3.5 w-3.5 text-primary" />
+              <div>
+                <p className="text-foreground">已关联卷宗文档作为待盖章稿</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  {preset?.documentTitle}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <Label className="text-[11px]">章种类 *</Label>
+            <Select value={sealType} onValueChange={setSealType}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="选择章种类" />
+              </SelectTrigger>
+              <SelectContent>
+                {enabledConfigs.map((c) => (
+                  <SelectItem key={c.type} value={c.type}>
+                    {SEAL_TYPE_CN[c.type] ?? c.type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {sealType && (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                {enabledConfigs.find((c) => c.type === sealType)?.description}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label className="text-[11px]">关联案件 (可选)</Label>
+            <Select
+              value={matterId || "none"}
+              onValueChange={(v) => setMatterId(v === "none" ? "" : v)}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="不关联案件" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">不关联案件</SelectItem>
+                {matters.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    <span className="font-mono text-[10px]">{m.internalCode}</span>
+                    <span className="ml-1">{m.title}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label className="text-[11px]">用章事由 *</Label>
+            <Textarea
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+              placeholder="如：出具法律意见书寄送 XX 公司"
+              rows={2}
+              className="mt-1 text-[12px]"
+            />
+          </div>
+
+          <div>
+            <Label className="text-[11px]">文件标题 *</Label>
+            <Input
+              value={documentTitle}
+              onChange={(e) => setDocumentTitle(e.target.value)}
+              className="mt-1"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-[11px]">页数</Label>
+              <Input
+                type="number"
+                min={1}
+                value={pageCount}
+                onChange={(e) => setPageCount(Math.max(1, parseInt(e.target.value) || 1))}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-[11px]">份数</Label>
+              <Input
+                type="number"
+                min={1}
+                value={copies}
+                onChange={(e) => setCopies(Math.max(1, parseInt(e.target.value) || 1))}
+                className="mt-1"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 text-[12px]">
+              <Checkbox
+                checked={crossPage}
+                onCheckedChange={(v) => setCrossPage(v === true)}
+              />
+              需要骑缝章
+            </label>
+            <label className="flex items-center gap-2 text-[12px]">
+              <Checkbox
+                checked={urgency === "URGENT"}
+                onCheckedChange={(v) => setUrgency(v === true ? "URGENT" : "NORMAL")}
+              />
+              <span className={urgency === "URGENT" ? "text-destructive" : ""}>紧急</span>
+            </label>
+          </div>
+
+          <div>
+            <Label className="text-[11px]">备注</Label>
+            <Textarea
+              value={requestNote}
+              onChange={(e) => setRequestNote(e.target.value)}
+              rows={2}
+              className="mt-1 text-[12px]"
+            />
+          </div>
+
+          {!hasExisting && (
+            <div>
+              <Label className="text-[11px]">待盖章稿 *</Label>
+              <div className="mt-1">
+                <label className="flex cursor-pointer items-center gap-2 rounded border border-dashed border-hairline px-3 py-3 text-[12px] text-muted-foreground hover:bg-muted/30">
+                  <Paperclip className="h-3.5 w-3.5" />
+                  {file ? (
+                    <span className="flex items-center gap-1 text-foreground">
+                      <FileText className="h-3 w-3" />
+                      {file.name}
+                    </span>
+                  ) : (
+                    "选择 PDF / docx 文件"
+                  )}
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <SheetFooter className="mt-6">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            取消
+          </Button>
+          <Button onClick={submit} disabled={pending}>
+            {pending && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+            提交申请
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
+}

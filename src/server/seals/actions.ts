@@ -1,0 +1,522 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { Prisma, type SealType, type UserRole } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { requireSession } from "@/lib/auth/session";
+import { audit } from "@/server/audit";
+import { readFile, writeFile } from "@/lib/storage/local";
+import { decryptBuffer, encryptBuffer, sha256 } from "@/lib/storage/crypto";
+import {
+  sealCreateSchema,
+  sealApproveSchema,
+  sealRejectSchema,
+  sealCancelSchema,
+  sealListFilterSchema
+} from "./schemas";
+
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+const FIRM_LEGAL_REP_KEY = "firmLegalRepUserId";
+
+// ============================================================
+// 流水号 SEAL-YYYY-NNNN
+// ============================================================
+async function generateSealCode(): Promise<string> {
+  const year = new Date().getFullYear();
+  const key = `seal-counter-${year}`;
+  const next = await prisma.$transaction(
+    async (tx) => {
+      const existing = await tx.systemSetting.findUnique({ where: { key } });
+      const current = (existing?.value as { value?: number })?.value ?? 0;
+      const incremented = current + 1;
+      await tx.systemSetting.upsert({
+        where: { key },
+        update: { value: { value: incremented } },
+        create: { key, value: { value: incremented } }
+      });
+      return incremented;
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+  );
+  return `SEAL-${year}-${String(next).padStart(4, "0")}`;
+}
+
+// ============================================================
+// 权限 - 谁能审批某 sealType
+// ============================================================
+async function getFirmLegalRepUserId(): Promise<string | null> {
+  const s = await prisma.systemSetting.findUnique({ where: { key: FIRM_LEGAL_REP_KEY } });
+  const v = (s?.value as { value?: string })?.value;
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+async function canApproveSealType(
+  sealType: SealType,
+  user: { id: string; role: string }
+): Promise<boolean> {
+  if (user.role === "ADMIN") return true;
+  const cfg = await prisma.sealTypeConfig.findUnique({ where: { type: sealType } });
+  if (!cfg || !cfg.enabled) return false;
+  if (cfg.requiresLegalRep) {
+    const repId = await getFirmLegalRepUserId();
+    return !!repId && repId === user.id;
+  }
+  return cfg.approverRoles.includes(user.role as UserRole);
+}
+
+// ============================================================
+// 列表
+// ============================================================
+export async function listSealRequests(input?: z.input<typeof sealListFilterSchema>) {
+  const session = await requireSession();
+  const filter = sealListFilterSchema.parse(input ?? {});
+  const where: Prisma.SealRequestWhereInput = {};
+
+  if (filter.status) where.status = filter.status;
+  if (filter.sealType) where.sealType = filter.sealType;
+
+  if (filter.scope === "mine") {
+    where.requestedById = session.user.id;
+  } else if (filter.scope === "approval") {
+    // 待我审批：根据用户角色拼出可审批的 sealTypes
+    const approvableTypes = await pickApprovableSealTypes(session.user);
+    if (approvableTypes.length === 0) {
+      return [];
+    }
+    where.sealType = { in: approvableTypes };
+    where.status = "PENDING";
+  } else {
+    // 全所流水：FINANCE 只看财务章；LAWYER/ASSISTANT 只看自己
+    if (session.user.role === "FINANCE") {
+      where.sealType = "FINANCE_SEAL";
+    } else if (session.user.role === "LAWYER" || session.user.role === "ASSISTANT") {
+      where.requestedById = session.user.id;
+    }
+    // ADMIN / PRINCIPAL_LAWYER 看全部
+  }
+
+  return prisma.sealRequest.findMany({
+    where,
+    orderBy: [{ status: "asc" }, { requestedAt: "desc" }],
+    include: {
+      matter: { select: { id: true, internalCode: true, title: true } },
+      requestedBy: { select: { id: true, name: true } },
+      approvedBy: { select: { id: true, name: true } },
+      stampedByUser: { select: { id: true, name: true } },
+      draftDoc: { select: { id: true, name: true, size: true } },
+      stampedDoc: { select: { id: true, name: true, size: true } }
+    }
+  });
+}
+
+async function pickApprovableSealTypes(user: { id: string; role: string }): Promise<SealType[]> {
+  if (user.role === "ADMIN") {
+    return ["OFFICIAL_SEAL", "CONTRACT_SEAL", "FINANCE_SEAL", "LEGAL_REP_SEAL", "CONTRACT_REVIEW_SEAL"];
+  }
+  const cfgs = await prisma.sealTypeConfig.findMany({ where: { enabled: true } });
+  const repId = await getFirmLegalRepUserId();
+  return cfgs
+    .filter((c) => {
+      if (c.requiresLegalRep) return !!repId && repId === user.id;
+      return c.approverRoles.includes(user.role as UserRole);
+    })
+    .map((c) => c.type);
+}
+
+export async function getSealRequest(id: string) {
+  await requireSession();
+  return prisma.sealRequest.findUnique({
+    where: { id },
+    include: {
+      matter: { select: { id: true, internalCode: true, title: true } },
+      requestedBy: { select: { id: true, name: true, role: true } },
+      approvedBy: { select: { id: true, name: true } },
+      stampedByUser: { select: { id: true, name: true } },
+      draftDoc: { select: { id: true, name: true, size: true, mimeType: true } },
+      stampedDoc: { select: { id: true, name: true, size: true, mimeType: true } },
+      parentSealRequest: { select: { id: true, code: true, status: true } }
+    }
+  });
+}
+
+export async function listSealTypeConfigs() {
+  await requireSession();
+  return prisma.sealTypeConfig.findMany({ orderBy: { type: "asc" } });
+}
+
+export async function getSealStats() {
+  const session = await requireSession();
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const monthStampedScope: Prisma.SealRequestWhereInput =
+    session.user.role === "FINANCE"
+      ? { status: "STAMPED", stampedAt: { gte: monthStart }, sealType: "FINANCE_SEAL" }
+      : { status: "STAMPED", stampedAt: { gte: monthStart } };
+
+  const approvableTypes = await pickApprovableSealTypes(session.user);
+
+  const [monthStamped, pendingApprovalCount, waitingStampCount] = await Promise.all([
+    prisma.sealRequest.count({ where: monthStampedScope }),
+    approvableTypes.length > 0
+      ? prisma.sealRequest.count({
+          where: { status: "PENDING", sealType: { in: approvableTypes } }
+        })
+      : 0,
+    prisma.sealRequest.count({ where: { status: "APPROVED" } })
+  ]);
+
+  return {
+    monthStamped,
+    pendingApprovalCount,
+    waitingStampCount
+  };
+}
+
+// ============================================================
+// 新建申请 - FormData（含 draftDoc 文件）
+// ============================================================
+export async function createSealRequest(formData: FormData) {
+  const session = await requireSession();
+  if (session.user.role !== "ADMIN" && session.user.role !== "PRINCIPAL_LAWYER" && session.user.role !== "LAWYER") {
+    throw new Error("仅律师、主任、管理员可申请用章");
+  }
+
+  const raw = {
+    sealType: formData.get("sealType"),
+    matterId: formData.get("matterId") || null,
+    purpose: formData.get("purpose"),
+    documentTitle: formData.get("documentTitle"),
+    pageCount: formData.get("pageCount") ?? "1",
+    requireCrossPageSeal: formData.get("requireCrossPageSeal") === "true",
+    copies: formData.get("copies") ?? "1",
+    urgency: formData.get("urgency") ?? "NORMAL",
+    requestNote: formData.get("requestNote") || "",
+    parentSealRequestId: formData.get("parentSealRequestId") || null
+  };
+  const data = sealCreateSchema.parse(raw);
+
+  const existingDraftDocId = formData.get("existingDraftDocId");
+  const draftFile = formData.get("draftDoc");
+
+  // 若有 matterId 校验存在
+  if (data.matterId) {
+    const m = await prisma.matter.findUnique({
+      where: { id: data.matterId },
+      select: { id: true }
+    });
+    if (!m) throw new Error("关联案件不存在");
+  }
+
+  // 准备 draftDocId：要么复制现有文档（卷宗联动），要么上传新文件
+  let draftDocPrepare: {
+    name: string;
+    mimeType: string;
+    size: number;
+    sha: string;
+    path: string;
+    algorithm: string;
+    iv: string;
+    authTag: string;
+  };
+
+  if (typeof existingDraftDocId === "string" && existingDraftDocId) {
+    // 联动：从卷宗带来的现有文档 → 复制一份独立副本（SealRequest.draftDocId 是 unique）
+    const src = await prisma.document.findUnique({
+      where: { id: existingDraftDocId }
+    });
+    if (!src) throw new Error("待盖章文档不存在");
+    const srcCt = await readFile(src.path);
+    const plain =
+      src.encrypted && src.iv && src.authTag
+        ? decryptBuffer(srcCt, src.iv, src.authTag)
+        : srcCt;
+    const enc = encryptBuffer(plain);
+    const newPath = await writeFile(
+      data.matterId ? `m_${data.matterId}` : "seals",
+      enc.ciphertext
+    );
+    draftDocPrepare = {
+      name: src.name,
+      mimeType: src.mimeType ?? "application/octet-stream",
+      size: src.size ?? plain.length,
+      sha: sha256(plain),
+      path: newPath,
+      algorithm: enc.algorithm,
+      iv: enc.iv.toString("base64"),
+      authTag: enc.authTag.toString("base64")
+    };
+  } else if (draftFile instanceof File && draftFile.size > 0) {
+    if (draftFile.size > MAX_FILE_SIZE) {
+      throw new Error("待盖章稿超过 20MB");
+    }
+    const buf = Buffer.from(await draftFile.arrayBuffer());
+    const enc = encryptBuffer(buf);
+    const newPath = await writeFile(
+      data.matterId ? `m_${data.matterId}` : "seals",
+      enc.ciphertext
+    );
+    draftDocPrepare = {
+      name: draftFile.name,
+      mimeType: draftFile.type || "application/octet-stream",
+      size: draftFile.size,
+      sha: sha256(buf),
+      path: newPath,
+      algorithm: enc.algorithm,
+      iv: enc.iv.toString("base64"),
+      authTag: enc.authTag.toString("base64")
+    };
+  } else {
+    throw new Error("请上传待盖章稿");
+  }
+
+  const code = await generateSealCode();
+
+  const created = await prisma.$transaction(async (tx) => {
+    const draftDoc = await tx.document.create({
+      data: {
+        matterId: data.matterId ?? undefined,
+        name: draftDocPrepare.name,
+        category: "OTHER",
+        path: draftDocPrepare.path,
+        mimeType: draftDocPrepare.mimeType,
+        size: draftDocPrepare.size,
+        sha256: draftDocPrepare.sha,
+        encrypted: true,
+        algorithm: draftDocPrepare.algorithm,
+        iv: draftDocPrepare.iv,
+        authTag: draftDocPrepare.authTag,
+        tags: ["用章申请", "待盖章稿"],
+        uploadedById: session.user.id
+      }
+    });
+
+    const seal = await tx.sealRequest.create({
+      data: {
+        code,
+        sealType: data.sealType,
+        matterId: data.matterId ?? undefined,
+        purpose: data.purpose.trim(),
+        documentTitle: data.documentTitle.trim(),
+        pageCount: data.pageCount,
+        requireCrossPageSeal: data.requireCrossPageSeal,
+        copies: data.copies,
+        urgency: data.urgency,
+        requestNote: (data.requestNote || "").trim() || null,
+        draftDocId: draftDoc.id,
+        requestedById: session.user.id,
+        status: "PENDING",
+        parentSealRequestId: data.parentSealRequestId ?? undefined
+      }
+    });
+
+    return seal;
+  });
+
+  await audit({
+    userId: session.user.id,
+    action: "SEAL_REQUEST_CREATE",
+    targetType: "SealRequest",
+    targetId: created.id,
+    detail: { code, sealType: data.sealType, matterId: data.matterId }
+  });
+
+  revalidatePath("/seals");
+  if (data.matterId) revalidatePath(`/matters/${data.matterId}`);
+  return { ok: true, id: created.id, code };
+}
+
+// ============================================================
+// 审批通过
+// ============================================================
+export async function approveSealRequest(input: z.infer<typeof sealApproveSchema>) {
+  const session = await requireSession();
+  const data = sealApproveSchema.parse(input);
+
+  const seal = await prisma.sealRequest.findUnique({
+    where: { id: data.id },
+    select: { id: true, status: true, sealType: true, matterId: true }
+  });
+  if (!seal) throw new Error("申请不存在");
+  if (seal.status !== "PENDING") throw new Error("此申请已处理");
+
+  const ok = await canApproveSealType(seal.sealType, session.user);
+  if (!ok) throw new Error("无权审批该用章类型");
+
+  await prisma.sealRequest.update({
+    where: { id: data.id },
+    data: {
+      status: "APPROVED",
+      approveNote: (data.note || "").trim() || null,
+      approvedById: session.user.id,
+      approvedAt: new Date()
+    }
+  });
+
+  await audit({
+    userId: session.user.id,
+    action: "SEAL_APPROVED",
+    targetType: "SealRequest",
+    targetId: data.id,
+    detail: { sealType: seal.sealType }
+  });
+
+  revalidatePath("/seals");
+  if (seal.matterId) revalidatePath(`/matters/${seal.matterId}`);
+  return { ok: true };
+}
+
+// ============================================================
+// 驳回
+// ============================================================
+export async function rejectSealRequest(input: z.infer<typeof sealRejectSchema>) {
+  const session = await requireSession();
+  const data = sealRejectSchema.parse(input);
+
+  const seal = await prisma.sealRequest.findUnique({
+    where: { id: data.id },
+    select: { id: true, status: true, sealType: true, matterId: true }
+  });
+  if (!seal) throw new Error("申请不存在");
+  if (seal.status !== "PENDING") throw new Error("此申请已处理");
+
+  const ok = await canApproveSealType(seal.sealType, session.user);
+  if (!ok) throw new Error("无权驳回该用章类型");
+
+  await prisma.sealRequest.update({
+    where: { id: data.id },
+    data: {
+      status: "REJECTED",
+      approveNote: data.reason,
+      approvedById: session.user.id,
+      approvedAt: new Date(),
+      rejectedAt: new Date()
+    }
+  });
+
+  await audit({
+    userId: session.user.id,
+    action: "SEAL_REJECTED",
+    targetType: "SealRequest",
+    targetId: data.id,
+    detail: { reason: data.reason }
+  });
+
+  revalidatePath("/seals");
+  if (seal.matterId) revalidatePath(`/matters/${seal.matterId}`);
+  return { ok: true };
+}
+
+// ============================================================
+// 盖章回填（FormData：stampedDoc 必传）
+// ============================================================
+export async function stampSealRequest(formData: FormData) {
+  const session = await requireSession();
+
+  const id = formData.get("id");
+  if (typeof id !== "string" || !id) throw new Error("id 缺失");
+
+  const seal = await prisma.sealRequest.findUnique({
+    where: { id },
+    select: { id: true, status: true, sealType: true, matterId: true }
+  });
+  if (!seal) throw new Error("申请不存在");
+  if (seal.status !== "APPROVED") throw new Error("仅已批准的申请可回填盖章件");
+
+  // 权限：审批人 / ADMIN；财务章额外允许 FINANCE
+  const okApprover = await canApproveSealType(seal.sealType, session.user);
+  if (!okApprover) throw new Error("无权回填盖章件");
+
+  const stampedFile = formData.get("stampedDoc");
+  if (!(stampedFile instanceof File) || stampedFile.size === 0) {
+    throw new Error("请上传盖章后扫描件");
+  }
+  if (stampedFile.size > MAX_FILE_SIZE) {
+    throw new Error("盖章件超过 20MB");
+  }
+
+  const buf = Buffer.from(await stampedFile.arrayBuffer());
+  const enc = encryptBuffer(buf);
+  const path = await writeFile(
+    seal.matterId ? `m_${seal.matterId}` : "seals",
+    enc.ciphertext
+  );
+
+  await prisma.$transaction(async (tx) => {
+    const stampedDoc = await tx.document.create({
+      data: {
+        matterId: seal.matterId ?? undefined,
+        name: stampedFile.name,
+        category: "OTHER",
+        path,
+        mimeType: stampedFile.type || "application/octet-stream",
+        size: stampedFile.size,
+        sha256: sha256(buf),
+        encrypted: true,
+        algorithm: enc.algorithm,
+        iv: enc.iv.toString("base64"),
+        authTag: enc.authTag.toString("base64"),
+        tags: ["用章申请", "盖章后扫描件"],
+        uploadedById: session.user.id
+      }
+    });
+    await tx.sealRequest.update({
+      where: { id },
+      data: {
+        status: "STAMPED",
+        stampedDocId: stampedDoc.id,
+        stampedById: session.user.id,
+        stampedAt: new Date()
+      }
+    });
+  });
+
+  await audit({
+    userId: session.user.id,
+    action: "SEAL_STAMPED",
+    targetType: "SealRequest",
+    targetId: id,
+    detail: { sealType: seal.sealType }
+  });
+
+  revalidatePath("/seals");
+  if (seal.matterId) revalidatePath(`/matters/${seal.matterId}`);
+  return { ok: true };
+}
+
+// ============================================================
+// 撤销（仅未审批 + 仅申请人/管理员）
+// ============================================================
+export async function cancelSealRequest(input: z.infer<typeof sealCancelSchema>) {
+  const session = await requireSession();
+  const data = sealCancelSchema.parse(input);
+
+  const seal = await prisma.sealRequest.findUnique({
+    where: { id: data.id },
+    select: { id: true, status: true, requestedById: true, matterId: true }
+  });
+  if (!seal) throw new Error("申请不存在");
+  if (seal.status !== "PENDING") throw new Error("仅未审批的申请可撤销");
+
+  const isOwner = seal.requestedById === session.user.id;
+  const isAdmin =
+    session.user.role === "ADMIN" || session.user.role === "PRINCIPAL_LAWYER";
+  if (!isOwner && !isAdmin) throw new Error("仅申请人或管理员可撤销");
+
+  await prisma.sealRequest.update({
+    where: { id: data.id },
+    data: { status: "CANCELLED" }
+  });
+
+  await audit({
+    userId: session.user.id,
+    action: "SEAL_CANCELLED",
+    targetType: "SealRequest",
+    targetId: data.id
+  });
+
+  revalidatePath("/seals");
+  if (seal.matterId) revalidatePath(`/matters/${seal.matterId}`);
+  return { ok: true };
+}
