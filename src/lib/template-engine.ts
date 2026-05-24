@@ -285,20 +285,69 @@ export async function buildContext(opts: {
 }
 
 /**
+ * docxtemplater 错误结构（Errors[].properties.explanation 含具体 tag）。
+ * 用类型断言读取，避免引入额外依赖。
+ */
+interface DocxTagError {
+  message?: string;
+  properties?: {
+    id?: string;
+    explanation?: string;
+    xtag?: string;
+    file?: string;
+  };
+}
+
+interface DocxMultiError extends Error {
+  properties?: {
+    errors?: DocxTagError[];
+    id?: string;
+    explanation?: string;
+  };
+}
+
+function formatDocxError(err: unknown): string {
+  if (!err || typeof err !== "object") return String(err);
+  const e = err as DocxMultiError;
+  const items = e.properties?.errors ?? [e as unknown as DocxTagError];
+  const lines: string[] = [];
+  for (const it of items) {
+    const tag = it.properties?.xtag ?? it.properties?.id ?? "?";
+    const reason = it.properties?.explanation ?? it.message ?? "未知";
+    lines.push(`[${tag}] ${reason}`);
+  }
+  return lines.join("\n");
+}
+
+/**
  * 渲染 docx：传入模板 Buffer + 上下文 → 返回填充后的 Buffer。
  * 模板用 {{var}} 语法（双大括号），避免与 docx 内嵌 "{" 冲突。
+ *
+ * 出错时抛出含具体 tag / 原因的中文异常，方便律师定位是哪个模板字段坏了。
  */
 export function renderDocxBuffer(
   templateBuffer: Buffer,
   context: RenderContext
 ): Buffer {
-  const zip = new PizZip(templateBuffer);
+  let zip: PizZip;
+  try {
+    zip = new PizZip(templateBuffer);
+  } catch (err) {
+    throw new Error(`模板文件损坏，无法解压：${err instanceof Error ? err.message : String(err)}`);
+  }
+
   const doc = new Docxtemplater(zip, {
     paragraphLoop: true,
     linebreaks: true,
     delimiters: { start: "{{", end: "}}" }
   });
-  doc.render(context as unknown as Record<string, unknown>);
+
+  try {
+    doc.render(context as unknown as Record<string, unknown>);
+  } catch (err) {
+    throw new Error(`模板渲染失败：\n${formatDocxError(err)}`);
+  }
+
   return doc.getZip().generate({ type: "nodebuffer" }) as Buffer;
 }
 
