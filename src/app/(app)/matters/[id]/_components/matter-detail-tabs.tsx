@@ -367,7 +367,7 @@ export function MatterDetailTabs({
         <div className="mt-4">
           {tab === "info" && (
             <div className="space-y-4">
-              <InfoPanel matter={matter} userOptions={userOptions} />
+              <InfoPanel matter={matter} userOptions={userOptions} finance={finance} />
               <ContractsCard intakeContracts={intakeContracts} sealContracts={sealContracts} />
               <ExpressMiniCard expresses={expresses} />
               <FinancePanel matterId={matter.id} finance={finance} userOptions={userOptions} />
