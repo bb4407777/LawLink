@@ -38,6 +38,7 @@ export async function uploadDocument(formData: FormData) {
   const category = formData.get("category");
   const encrypted = formData.get("encrypted") === "true";
   const tagsRaw = formData.get("tags");
+  const archiveChecklistItemIdRaw = formData.get("archiveChecklistItemId");
   const file = formData.get("file");
 
   if (!(file instanceof File)) throw new Error("缺少文件");
@@ -109,6 +110,11 @@ export async function uploadDocument(formData: FormData) {
     path = await storage.writeFile(storageBucket, raw);
   }
 
+  const archiveChecklistItemId =
+    typeof archiveChecklistItemIdRaw === "string" && archiveChecklistItemIdRaw
+      ? archiveChecklistItemIdRaw
+      : null;
+
   const created = await prisma.document.create({
     data: {
       matterId,
@@ -126,6 +132,7 @@ export async function uploadDocument(formData: FormData) {
       iv,
       authTag,
       tags,
+      archiveChecklistItemId,
       uploadedById: session.user.id
     }
   });

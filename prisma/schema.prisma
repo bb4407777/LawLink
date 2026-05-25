@@ -821,12 +821,17 @@ model Document {
   sealAsDraft             SealRequest?      @relation("SealDraft")
   sealAsStamped           SealRequest?      @relation("SealStamped")
 
+  // v0.17: 归档清单关联——上传时绑定到 ArchiveChecklistItem.id（lib/archive/checklists.ts 内的字符串 id），
+  // 用于归档向导自动勾选已上传的必交项。一个材料只能绑定一个 checklist item。
+  archiveChecklistItemId String?
+
   @@index([matterId, category])
   @@index([intakeId])
   @@index([procedureId])
   @@index([familyId])
   @@index([folderId])
   @@index([templateId])
+  @@index([matterId, archiveChecklistItemId])
 }
 
 // ============================================================
