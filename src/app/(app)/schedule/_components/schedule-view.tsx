@@ -12,13 +12,15 @@ import {
   AlertTriangle,
   CheckSquare,
   List,
-  Grid3X3
+  Grid3X3,
+  Plus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn, daysUntil } from "@/lib/utils";
 import type { ScheduleItem } from "@/server/schedule/actions";
 import { procedureTypeLabel } from "@/lib/enums";
+import { AddTaskDialog } from "./add-task-dialog";
 
 const typeMeta = {
   hearing: { icon: Gavel, label: "开庭", color: "#5B8DEF" },
@@ -28,10 +30,19 @@ const typeMeta = {
 
 const WEEKDAY_LABELS = ["一", "二", "三", "四", "五", "六", "日"];
 
-export function ScheduleView({ items }: { items: ScheduleItem[] }) {
-  const [view, setView] = useState<"list" | "calendar">("list");
+type MatterPickerItem = { id: string; internalCode: string; title: string };
+
+export function ScheduleView({
+  items,
+  matters
+}: {
+  items: ScheduleItem[];
+  matters: MatterPickerItem[];
+}) {
+  const [view, setView] = useState<"list" | "calendar">("calendar");
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [addTaskDate, setAddTaskDate] = useState<Date | null>(null);
 
   const itemsWithDate = useMemo(
     () =>
@@ -117,8 +128,16 @@ export function ScheduleView({ items }: { items: ScheduleItem[] }) {
           onOffsetChange={setMonthOffset}
           selectedDay={selectedDay}
           onSelectDay={setSelectedDay}
+          onAddTask={(d) => setAddTaskDate(d)}
         />
       )}
+
+      <AddTaskDialog
+        open={addTaskDate !== null}
+        onOpenChange={(o) => !o && setAddTaskDate(null)}
+        date={addTaskDate}
+        matters={matters}
+      />
     </motion.div>
   );
 }
@@ -244,13 +263,15 @@ function CalendarView({
   monthOffset,
   onOffsetChange,
   selectedDay,
-  onSelectDay
+  onSelectDay,
+  onAddTask
 }: {
   items: (ScheduleItem & { dateKey: string })[];
   monthOffset: number;
   onOffsetChange: (n: number) => void;
   selectedDay: string | null;
   onSelectDay: (d: string | null) => void;
+  onAddTask: (d: Date) => void;
 }) {
   const now = new Date();
   const cursor = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
@@ -391,21 +412,31 @@ function CalendarView({
         </div>
       </section>
 
-      {/* 右侧：选中日详情 */}
+      {/* 右侧：选中日详情 + 添加任务 */}
       <section className="rounded-xl border border-border bg-card p-4 lg:col-span-1">
         {selectedDay ? (
           <>
-            <header className="mb-3">
-              <h3 className="text-base font-semibold">
-                {new Date(selectedDay).toLocaleDateString("zh-CN", {
-                  month: "long",
-                  day: "numeric",
-                  weekday: "long"
-                })}
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                {selectedItems.length} 项
-              </p>
+            <header className="mb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-semibold">
+                  {new Date(selectedDay).toLocaleDateString("zh-CN", {
+                    month: "long",
+                    day: "numeric",
+                    weekday: "long"
+                  })}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {selectedItems.length} 项
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => onAddTask(new Date(selectedDay))}
+                className="h-7 gap-1"
+              >
+                <Plus className="h-3 w-3" />
+                添加任务
+              </Button>
             </header>
             {selectedItems.length === 0 ? (
               <p className="py-6 text-center text-xs text-muted-foreground">这一天没有日程</p>
@@ -424,7 +455,7 @@ function CalendarView({
           </>
         ) : (
           <div className="flex h-full items-center justify-center text-center">
-            <p className="text-sm text-muted-foreground">点击月历上的日期查看详细</p>
+            <p className="text-sm text-muted-foreground">点击月历上的日期查看详细 / 添加任务</p>
           </div>
         )}
       </section>
