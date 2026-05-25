@@ -86,7 +86,10 @@ export async function archiveMatter(input: ArchiveSubmitInput) {
     throw new Error(`渲染卷宗目录失败：${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // 事务：建 ArchiveRecord + 改 Matter + TimelineEvent
+  // v0.16: 归档申请落 PENDING_REVIEW（管理员审批通过后才正式归档）
+  // 管理员自己提交时，自动通过（一步到位）
+  const autoApprove = session.user.role === "ADMIN";
+
   await prisma.$transaction(async (tx) => {
     await tx.archiveRecord.create({
       data: {
@@ -100,24 +103,31 @@ export async function archiveMatter(input: ArchiveSubmitInput) {
         missingItems,
         coverDocId,
         catalogDocId,
-        archivedBy: session.user.name ?? session.user.id
+        archivedBy: session.user.name ?? session.user.id,
+        status: autoApprove ? "APPROVED" : "PENDING_REVIEW",
+        reviewedById: autoApprove ? session.user.id : null,
+        reviewedAt: autoApprove ? now : null
       }
     });
 
-    await tx.matter.update({
-      where: { id: matter.id },
-      data: {
-        status: "ARCHIVED",
-        archivedAt: now,
-        closedAt: data.completedAt
-      }
-    });
+    if (autoApprove) {
+      await tx.matter.update({
+        where: { id: matter.id },
+        data: {
+          status: "ARCHIVED",
+          archivedAt: now,
+          closedAt: data.completedAt
+        }
+      });
+    }
 
     await tx.timelineEvent.create({
       data: {
         matterId: matter.id,
-        eventType: "MATTER_ARCHIVED",
-        title: `案件已归档（${archiveNo}）`,
+        eventType: autoApprove ? "MATTER_ARCHIVED" : "MATTER_ARCHIVE_REQUESTED",
+        title: autoApprove
+          ? `案件已归档（${archiveNo}）`
+          : `归档申请已提交（${archiveNo}，待审批）`,
         content: `结案方式：${CLOSED_REASON_CN[data.closedReason]}。${data.summary}`,
         occurredAt: now
       }
@@ -140,7 +150,103 @@ export async function archiveMatter(input: ArchiveSubmitInput) {
   revalidatePath(`/matters/${matter.id}`);
   revalidatePath("/matters");
   revalidatePath("/archive");
-  return { ok: true, archiveNo };
+  return { ok: true, archiveNo, status: autoApprove ? "APPROVED" : "PENDING_REVIEW" };
+}
+
+/**
+ * v0.16: 管理员审批通过归档申请（PENDING_REVIEW → APPROVED）
+ */
+export async function approveArchiveRecord(input: { archiveId: string; note?: string }) {
+  const session = await requireSession();
+  if (session.user.role !== "ADMIN") {
+    throw new Error("只有管理员可以审批归档申请");
+  }
+
+  const record = await prisma.archiveRecord.findUnique({
+    where: { id: input.archiveId },
+    select: { id: true, matterId: true, status: true, completedAt: true, archiveNo: true }
+  });
+  if (!record) throw new Error("归档记录不存在");
+  if (record.status !== "PENDING_REVIEW") throw new Error("此归档申请已审批");
+
+  const now = new Date();
+  await prisma.$transaction(async (tx) => {
+    await tx.archiveRecord.update({
+      where: { id: record.id },
+      data: {
+        status: "APPROVED",
+        reviewedById: session.user.id,
+        reviewedAt: now,
+        reviewNote: input.note?.trim() || null
+      }
+    });
+    await tx.matter.update({
+      where: { id: record.matterId },
+      data: { status: "ARCHIVED", archivedAt: now, closedAt: record.completedAt }
+    });
+    await tx.timelineEvent.create({
+      data: {
+        matterId: record.matterId,
+        eventType: "MATTER_ARCHIVED",
+        title: `案件已归档（${record.archiveNo}）`,
+        content: input.note?.trim() ? `管理员审批：${input.note.trim()}` : "管理员审批通过",
+        occurredAt: now
+      }
+    });
+  });
+
+  await audit({
+    userId: session.user.id,
+    action: "ARCHIVE_APPROVE",
+    targetType: "ArchiveRecord",
+    targetId: record.id,
+    detail: { matterId: record.matterId, archiveNo: record.archiveNo }
+  });
+
+  revalidatePath(`/matters/${record.matterId}`);
+  revalidatePath("/matters");
+  revalidatePath("/archive");
+  return { ok: true };
+}
+
+/**
+ * v0.16: 管理员驳回归档申请
+ */
+export async function rejectArchiveRecord(input: { archiveId: string; note: string }) {
+  const session = await requireSession();
+  if (session.user.role !== "ADMIN") {
+    throw new Error("只有管理员可以驳回归档申请");
+  }
+  if (!input.note.trim()) throw new Error("请填写驳回原因");
+
+  const record = await prisma.archiveRecord.findUnique({
+    where: { id: input.archiveId },
+    select: { id: true, matterId: true, status: true, archiveNo: true }
+  });
+  if (!record) throw new Error("归档记录不存在");
+  if (record.status !== "PENDING_REVIEW") throw new Error("此归档申请已审批");
+
+  await prisma.archiveRecord.update({
+    where: { id: record.id },
+    data: {
+      status: "REJECTED",
+      reviewedById: session.user.id,
+      reviewedAt: new Date(),
+      reviewNote: input.note.trim()
+    }
+  });
+
+  await audit({
+    userId: session.user.id,
+    action: "ARCHIVE_REJECT",
+    targetType: "ArchiveRecord",
+    targetId: record.id,
+    detail: { matterId: record.matterId, archiveNo: record.archiveNo, note: input.note.trim() }
+  });
+
+  revalidatePath(`/matters/${record.matterId}`);
+  revalidatePath("/archive");
+  return { ok: true };
 }
 
 /**

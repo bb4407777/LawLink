@@ -79,6 +79,12 @@ export async function listMatters(input: Partial<MatterListQuery> = {}) {
           take: 3,
           select: { id: true, name: true, role: true, standing: true }
         },
+        // v0.16: 是否有归档申请待审批
+        archiveRecords: {
+          where: { status: "PENDING_REVIEW" },
+          take: 1,
+          select: { id: true }
+        },
         _count: { select: { procedures: true } }
       }
     }),

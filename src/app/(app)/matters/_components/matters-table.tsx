@@ -17,6 +17,7 @@ export type MatterRow = Matter & {
   cause: { id: string; name: string } | null;
   procedures: { id: string; type: string; caseNumber: string | null; status: string }[];
   parties: { id: string; name: string; role: PartyRole; standing: LitigationStanding | null }[];
+  archiveRecords?: { id: string }[];
   _count: { procedures: number };
   claimAmount: Prisma.Decimal | null;
   intakeDate: Date | null;
@@ -59,6 +60,7 @@ function MatterListRow({ m }: { m: MatterRow }) {
   const procLabel = current
     ? procedureTypeLabel[current.type as keyof typeof procedureTypeLabel] ?? current.type
     : null;
+  const hasPendingArchive = (m.archiveRecords?.length ?? 0) > 0;
 
   return (
     <Link
@@ -80,7 +82,13 @@ function MatterListRow({ m }: { m: MatterRow }) {
           <span className="h-1 w-1 rounded-full" style={{ background: categoryColor }} />
           {matterCategoryLabel[m.category]}
         </span>
-        <StatusChip status={m.status} />
+        {hasPendingArchive ? (
+          <span className="inline-flex h-5 items-center rounded-full border border-purple-500/30 bg-purple-500/15 px-2 text-[10px] font-medium text-purple-700">
+            归档中
+          </span>
+        ) : (
+          <StatusChip status={m.status} />
+        )}
 
         <div className="ml-auto flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
           <span>主办</span>

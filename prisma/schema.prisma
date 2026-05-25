@@ -966,6 +966,12 @@ model TimelineEvent {
   @@index([matterId, occurredAt])
 }
 
+enum ArchiveStatus {
+  PENDING_REVIEW // 归档申请已提交，等管理员审批
+  APPROVED // 已审批通过，正式归档
+  REJECTED // 管理员驳回
+}
+
 model ArchiveRecord {
   id       String @id @default(cuid())
   matterId String
@@ -987,8 +993,15 @@ model ArchiveRecord {
   exportPath String?
   checksum   String?
 
+  // v0.16: 归档审批流
+  status       ArchiveStatus @default(PENDING_REVIEW)
+  reviewedById String?
+  reviewedAt   DateTime?
+  reviewNote   String?
+
   @@index([matterId])
   @@index([archivedAt])
+  @@index([status])
 }
 
 enum ArchiveClosedReason {

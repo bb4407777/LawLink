@@ -105,9 +105,14 @@ export function ArchiveWizardDialog({ matterId, open, onOpenChange }: Props) {
           checklist: checked,
           forceWithMissing
         });
-        toast.success(`案件已归档（${result.archiveNo}）`, {
-          description: "卷宗封皮 + 目录已自动生成至归档卷宗"
-        });
+        toast.success(
+          result.status === "APPROVED"
+            ? `案件已归档（${result.archiveNo}）`
+            : `归档申请已提交（${result.archiveNo}），等待管理员审批`,
+          {
+            description: "卷宗封皮 + 目录已自动生成至归档卷宗"
+          }
+        );
         onOpenChange(false);
         router.refresh();
       } catch (err) {
@@ -245,25 +250,40 @@ export function ArchiveWizardDialog({ matterId, open, onOpenChange }: Props) {
                 </section>
               )}
 
-              {/* 缺项警告 */}
+              {/* 缺项警告 - 红色 + 提示先去案卷材料上传 */}
               {missingRequired.length > 0 && (
-                <Alert variant="destructive" className="border-amber-500/40 bg-amber-500/10 text-amber-200">
+                <Alert variant="destructive" className="border-destructive/50 bg-destructive/10 text-destructive">
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle className="text-sm">
+                  <AlertTitle className="text-sm font-medium text-destructive">
                     仍有 {missingRequired.length} 项必交材料未勾选
                   </AlertTitle>
-                  <AlertDescription className="text-xs mt-1">
-                    {missingRequired.map((x) => x.label).join("、")}
+                  <AlertDescription className="mt-1 text-xs text-destructive/85">
+                    <div className="mb-1">缺项：{missingRequired.map((x) => x.label).join("、")}</div>
+                    <div>
+                      请先到「案卷材料」上传对应文件，回来勾选；如材料确实无法补齐，可勾选下方强制归档。
+                    </div>
                   </AlertDescription>
-                  <label className="mt-3 flex items-center gap-2 cursor-pointer">
+                  <label className="mt-3 flex cursor-pointer items-center gap-2">
                     <Checkbox
                       checked={forceWithMissing}
                       onCheckedChange={(v) => setForceWithMissing(!!v)}
                     />
-                    <span className="text-xs">强制归档（缺项 ID 会记入档案，可在归档详情查看）</span>
+                    <span className="text-xs text-destructive">
+                      强制归档（缺项 ID 会记入档案，可在归档详情查看）
+                    </span>
                   </label>
                 </Alert>
               )}
+
+              {/* v0.16: 审批流提示 */}
+              <Alert className="border-primary/30 bg-primary/5">
+                <AlertTitle className="text-xs font-medium text-primary">
+                  归档审批流程
+                </AlertTitle>
+                <AlertDescription className="mt-0.5 text-[11.5px] text-muted-foreground">
+                  提交后状态为「归档中」，需管理员审批通过才正式归档。管理员本人提交时自动通过。
+                </AlertDescription>
+              </Alert>
             </div>
           </ScrollArea>
         )}
