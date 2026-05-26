@@ -163,3 +163,36 @@
   }
   .scrollbar-none::-webkit-scrollbar { display: none; }
 }
+
+/* v0.22: 打印 / 保 PDF 样式 —— 律师 Cmd+P 直接出报告，不引 puppeteer */
+@media print {
+  /* 隐藏 Sidebar / Topbar / 任何标 .ll-no-print 的 UI */
+  aside,
+  header,
+  .ll-no-print {
+    display: none !important;
+  }
+  /* 移除 main 的左边距（无 sidebar 占位）+ 解开 max-width */
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  body, html {
+    background: white !important;
+  }
+  /* 表格、卡片不被分页切断 */
+  section,
+  table,
+  tr {
+    page-break-inside: avoid;
+  }
+  /* 卡片去阴影 */
+  .ll-surface {
+    box-shadow: none !important;
+  }
+  /* 链接的下划线在纸上多余 */
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+}

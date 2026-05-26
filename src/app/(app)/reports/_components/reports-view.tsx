@@ -14,7 +14,8 @@ import {
   BarChart3,
   CircleAlert,
   Send,
-  Loader2
+  Loader2,
+  Printer
 } from "lucide-react";
 import { matterCategoryLabel, matterCategoryColor } from "@/lib/enums";
 import type { ReportData } from "@/server/reports/queries";
@@ -141,7 +142,7 @@ export function ReportsView({
             统计期：<span className="text-foreground">{periodLabel}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ll-no-print">
           <div className="flex rounded-md border border-border bg-card p-0.5">
             {(["month", "quarter", "year", "lastYear"] as const).map((k) => (
               <button
@@ -202,6 +203,16 @@ export function ReportsView({
             )}
             推送周报
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => window.print()}
+            className="gap-1.5"
+            title="Cmd/Ctrl+P 同样可触发，可以「另存为 PDF」"
+          >
+            <Printer className="h-3.5 w-3.5" />
+            打印 / PDF
+          </Button>
           <Link href={exportHref} prefetch={false}>
             <Button size="sm" className="gap-1.5">
               <Download className="h-3.5 w-3.5" />
@@ -212,7 +223,7 @@ export function ReportsView({
       </header>
 
       {customOpen && (
-        <div className="flex flex-wrap items-end gap-2 rounded-md border border-border bg-card p-3 text-xs">
+        <div className="ll-no-print flex flex-wrap items-end gap-2 rounded-md border border-border bg-card p-3 text-xs">
           <div>
             <label className="text-muted-foreground">起始（含）</label>
             <Input
