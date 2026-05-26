@@ -324,6 +324,8 @@ model User {
   notifications         Notification[]
   // v0.21: AI 文书审查历史（发起人）
   aiReviews             ReviewRecord[]        @relation("ReviewAuthor")
+  // v0.22: 律所资料上传者
+  firmFilesUploaded     FirmFile[]            @relation("FirmFileUploader")
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
 }
@@ -1415,4 +1417,41 @@ model ReviewRecord {
 
   @@index([documentId, reviewedAt])
   @@index([matterId, reviewedAt])
+}
+
+// v0.22: 律所级资料库（与案件无关）
+// 制度 / 指引 / 参考模板（不同于 v0.8 生成型 DocumentTemplate）/ 其他文件
+enum FirmFileCategory {
+  POLICY     // 制度（员工手册、保密协议、薪酬制度等）
+  GUIDE      // 指引（办案指引、客户接待指引等）
+  TEMPLATE   // 参考模板（律师下载手动改的样本，区别于 docxtemplater 生成型）
+  REFERENCE  // 其他文件（营业执照、执业证扫描件等）
+}
+
+model FirmFile {
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+  category    FirmFileCategory
+  tags        String[]
+
+  path     String
+  mimeType String?
+  size     Int
+  sha256   String?
+
+  uploadedById String
+  uploadedBy   User   @relation("FirmFileUploader", fields: [uploadedById], references: [id])
+
+  // 旧版被新版替代时，旧版指向新版 id；列表默认隐藏被替代的
+  supersededById String?
+  supersededBy   FirmFile?  @relation("FirmFileSupersedes", fields: [supersededById], references: [id])
+  supersedes     FirmFile[] @relation("FirmFileSupersedes")
+
+  archivedAt DateTime? // soft delete
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([category, archivedAt, createdAt])
+  @@index([supersededById])
 }
