@@ -14,7 +14,8 @@ import {
   FileText,
   FileSpreadsheet,
   FileImage,
-  FileArchive
+  FileArchive,
+  Sparkles
 } from "lucide-react";
 import type { DocumentCategory, Document } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,21 @@ import {
 } from "@/components/ui/sheet";
 import { uploadDocument, deleteDocument } from "@/server/documents/actions";
 import { cn } from "@/lib/utils";
+import { DocumentReviewDialog } from "./document-review-dialog";
+
+// AI 审查支持的 mime（前端判断是否亮按钮）
+const AI_REVIEW_MIMES = new Set([
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/docx",
+  "text/plain",
+  "text/markdown"
+]);
+function canReviewByAi(mime: string | null | undefined) {
+  if (!mime) return false;
+  if (AI_REVIEW_MIMES.has(mime)) return true;
+  return mime.startsWith("text/");
+}
 
 export type DocumentPayload = Document & {
   uploadedBy: { id: string; name: string };
@@ -103,6 +119,7 @@ export function DocumentsPanel({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<DocumentCategory | "ALL">("ALL");
   const [isPending, startTransition] = useTransition();
+  const [reviewDocId, setReviewDocId] = useState<string | null>(null);
 
   const filtered =
     activeCategory === "ALL"
@@ -223,6 +240,16 @@ export function DocumentsPanel({
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
+                  {canReviewByAi(d.mimeType) && (
+                    <button
+                      type="button"
+                      onClick={() => setReviewDocId(d.id)}
+                      className="rounded-md p-1.5 text-muted-foreground hover:bg-popover hover:text-violet-600"
+                      title="AI 审查"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                   <a
                     href={`/api/documents/${d.id}/download`}
                     className="rounded-md p-1.5 text-muted-foreground hover:bg-popover hover:text-primary"
@@ -253,6 +280,13 @@ export function DocumentsPanel({
         folders={folders}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
+      />
+      <DocumentReviewDialog
+        open={reviewDocId !== null}
+        documentId={reviewDocId}
+        onOpenChange={(o) => {
+          if (!o) setReviewDocId(null);
+        }}
       />
     </div>
   );
