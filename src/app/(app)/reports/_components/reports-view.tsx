@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import type { LucideIcon } from "lucide-react";
 import {
   Wallet,
@@ -11,10 +12,13 @@ import {
   CheckCircle2,
   Download,
   BarChart3,
-  CircleAlert
+  CircleAlert,
+  Send,
+  Loader2
 } from "lucide-react";
 import { matterCategoryLabel, matterCategoryColor } from "@/lib/enums";
 import type { ReportData } from "@/server/reports/queries";
+import { pushWeeklyReportToAll } from "@/server/reports/push-weekly";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -50,6 +54,26 @@ export function ReportsView({
   const [customOpen, setCustomOpen] = useState(periodKey === "custom");
   const [start, setStart] = useState(customStart ?? "");
   const [end, setEnd] = useState(customEnd ?? "");
+  const [pushing, startPushing] = useTransition();
+
+  function handlePushWeekly() {
+    if (!confirm("立刻给所有 ADMIN / 主任律师 / 律师推送本周报告？每人收到一条通知。")) return;
+    startPushing(async () => {
+      try {
+        const res = await pushWeeklyReportToAll();
+        if (res.failed.length === 0) {
+          toast.success(`已推送本周报告（${res.weekLabel}），共 ${res.succeeded} 人`);
+        } else {
+          toast.warning(
+            `部分成功：${res.succeeded} 成功，${res.failed.length} 失败`,
+            { description: res.failed.map((f) => f.error).slice(0, 3).join("；") }
+          );
+        }
+      } catch (err) {
+        toast.error("推送失败", { description: err instanceof Error ? err.message : "" });
+      }
+    });
+  }
 
   function switchPreset(k: Exclude<PeriodKey, "custom">) {
     const next = new URLSearchParams(sp.toString());
@@ -124,6 +148,21 @@ export function ReportsView({
               自定义
             </button>
           </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handlePushWeekly}
+            disabled={pushing}
+            className="gap-1.5"
+            title="给所有律师推送本周报告通知"
+          >
+            {pushing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Send className="h-3.5 w-3.5" />
+            )}
+            推送周报
+          </Button>
           <Link href={exportHref} prefetch={false}>
             <Button size="sm" className="gap-1.5">
               <Download className="h-3.5 w-3.5" />
