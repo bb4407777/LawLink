@@ -23,6 +23,7 @@ import type {
   ReviewIssueAnalysis
 } from "@/server/reports/analytics";
 import { pushWeeklyReportToAll } from "@/server/reports/push-weekly";
+import { triggerArchiveOverdueScanNow } from "@/server/cron/manual-triggers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -63,6 +64,21 @@ export function ReportsView({
   const [start, setStart] = useState(customStart ?? "");
   const [end, setEnd] = useState(customEnd ?? "");
   const [pushing, startPushing] = useTransition();
+  const [scanning, startScanning] = useTransition();
+
+  function handleScanOverdue() {
+    if (!confirm("立刻扫描已结案超过 30 天未归档的案件，给主办律师发预警通知？")) return;
+    startScanning(async () => {
+      try {
+        const r = await triggerArchiveOverdueScanNow();
+        toast.success(
+          `归档逾期扫描完成：${r.scanned} 候选 / ${r.notified} 通知 / ${r.suppressed} 抑制`
+        );
+      } catch (err) {
+        toast.error("扫描失败", { description: err instanceof Error ? err.message : "" });
+      }
+    });
+  }
 
   function handlePushWeekly() {
     if (!confirm("立刻给所有 ADMIN / 主任律师 / 律师推送本周报告？每人收到一条通知。")) return;
@@ -156,6 +172,21 @@ export function ReportsView({
               自定义
             </button>
           </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleScanOverdue}
+            disabled={scanning}
+            className="gap-1.5"
+            title="扫描已结超过 30 天未归档的案件"
+          >
+            {scanning ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Send className="h-3.5 w-3.5" />
+            )}
+            扫归档逾期
+          </Button>
           <Button
             size="sm"
             variant="outline"

@@ -6,7 +6,9 @@ const nextConfig = {
     serverActions: {
       // 材料上传需要更大的 body 限制（默认 1MB）
       bodySizeLimit: "25mb"
-    }
+    },
+    // v0.22: 启用 instrumentation.ts（进程启动时注册 cron）
+    instrumentationHook: true
   }
 };
 

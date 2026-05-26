@@ -1,10 +1,14 @@
 "use server";
 
 /**
- * v0.21: admin 手动推送本周报告给全员（不依赖 cron）
+ * v0.21: 推送本周报告给全员
+ *
+ * 两个入口：
+ * - admin 手动：pushWeeklyReportToAll（require session）
+ * - cron 自动（v0.22）：runWeeklyReportPush（无 auth，trigger=cron）
  *
  * 收件人：所有 active 的 ADMIN / PRINCIPAL_LAWYER / LAWYER。
- * 内容：每个律师收到自己的 LawyerWeeklyDigest 摘要，作为 Notification（type=SYSTEM）。
+ * 每人收到自己的 LawyerWeeklyDigest 摘要，作为 Notification（type=SYSTEM）。
  */
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
@@ -16,16 +20,19 @@ import {
   formatWeeklyDigestContent
 } from "./weekly";
 
-export async function pushWeeklyReportToAll(): Promise<{
+export type WeeklyPushResult = {
   succeeded: number;
   failed: { userId: string; error: string }[];
   weekLabel: string;
-}> {
-  const session = await requireSession();
-  if (session.user.role !== "ADMIN" && session.user.role !== "PRINCIPAL_LAWYER") {
-    throw new Error("仅管理员 / 主任律师可推送周报");
-  }
+};
 
+/**
+ * 核心逻辑，可被 server action 或 cron 调用。
+ * triggerUserId: server action 传当前 admin id；cron 传 null。
+ */
+export async function runWeeklyReportPush(
+  triggerUserId: string | null
+): Promise<WeeklyPushResult> {
   const period = weekPeriod();
   const recipients = await prisma.user.findMany({
     where: {
@@ -64,17 +71,26 @@ export async function pushWeeklyReportToAll(): Promise<{
   }
 
   await audit({
-    userId: session.user.id,
-    action: "WEEKLY_REPORT_PUSH",
+    userId: triggerUserId,
+    action: triggerUserId ? "WEEKLY_REPORT_PUSH" : "WEEKLY_REPORT_PUSH_CRON",
     targetType: "Report",
     targetId: period.label,
     detail: {
       weekLabel: period.label,
       total: recipients.length,
       succeeded,
-      failed: failed.length
+      failed: failed.length,
+      trigger: triggerUserId ? "manual" : "cron"
     }
   });
 
   return { succeeded, failed, weekLabel: period.label };
+}
+
+export async function pushWeeklyReportToAll(): Promise<WeeklyPushResult> {
+  const session = await requireSession();
+  if (session.user.role !== "ADMIN" && session.user.role !== "PRINCIPAL_LAWYER") {
+    throw new Error("仅管理员 / 主任律师可推送周报");
+  }
+  return runWeeklyReportPush(session.user.id);
 }
