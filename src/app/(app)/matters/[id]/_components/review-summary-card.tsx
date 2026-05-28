@@ -12,17 +12,9 @@ export function ReviewSummaryCard({
 }) {
   const hasRecords = summary.recordCount > 0;
 
-  // 即使没记录也渲染一个轻量入口供律师启动批量审查
+  // v0.27: AI 复检入口暂隐 —— 没记录时整张卡片不渲染（避免出现没按钮的空提示）
   if (!hasRecords) {
-    return (
-      <section className="flex items-center justify-between rounded-lg border border-violet-200 bg-violet-50/30 px-3 py-2">
-        <span className="flex items-center gap-1.5 text-xs text-violet-700">
-          <Sparkles className="h-3.5 w-3.5" />
-          本案尚未做过 AI 文书审查
-        </span>
-        <BatchReviewButton matterId={matterId} />
-      </section>
-    );
+    return null;
   }
 
   return (

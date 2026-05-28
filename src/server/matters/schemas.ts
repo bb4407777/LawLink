@@ -92,7 +92,11 @@ export const partyInputSchema = z.object({
 });
 
 export const matterCreateSchema = z.object({
-  title: z.string().min(1, "案件名称必填").max(200),
+  // v0.27: 案件名称去除所有空白字符（产品要求，避免列表/详情显示空格）
+  title: z.preprocess(
+    (v) => (typeof v === "string" ? v.replace(/\s+/g, "") : v),
+    z.string().min(1, "案件名称必填").max(200)
+  ),
   category: matterCategorySchema,
 
   // 案由

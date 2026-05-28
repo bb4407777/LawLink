@@ -18,11 +18,16 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 
+// v0.27: AI 复检功能暂时隐藏（后端 server action 保留），改回时去掉此 flag
+const SHOW_AI_RECHECK = false;
+
 export function BatchReviewButton({ matterId }: { matterId: string }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<BatchReviewSummary | null>(null);
   const [open, setOpen] = useState(false);
+
+  if (!SHOW_AI_RECHECK) return null;
 
   function run() {
     if (

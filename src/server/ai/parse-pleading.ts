@@ -1,16 +1,16 @@
 "use server";
 
 /**
- * v0.11: 起诉状 / 申请书 OCR 骨架
+ * v0.11: 起诉状 / 申请书 OCR 骨架（v0.27 扩展：支持扫描版 PDF）
  *
  * 支持图片（jpg/png/webp）和 PDF。
  * - 图片走 aiVision 视觉识别
- * - PDF 走 unpdf 服务端文本抽取 + aiChat 解析（轻量，无 canvas 依赖）
- *   注意：PDF 若是扫描件而非文本层，文本抽取会为空，建议先 OCR 转图后再传图
+ * - PDF 优先走 unpdf 文本抽取 + aiChat（成本低、速度快）
+ * - PDF 文本层为空（扫描件）时 fallback：unpdf renderPageAsImage 渲染前 3 页 → 逐页 aiVision → 合并结果
  */
 import { requireSession } from "@/lib/auth/session";
 import { aiChat, aiVision, extractJson, AiNotConfiguredError } from "@/lib/ai/client";
-import { extractText, getDocumentProxy } from "unpdf";
+import { extractText, getDocumentProxy, renderPageAsImage } from "unpdf";
 
 export type PleadingPartyHint = {
   name: string;
@@ -60,6 +60,29 @@ function normalizeResult(parsed: Partial<ParsedPleading> | null | undefined): Pa
   };
 }
 
+// 合并多页扫描结果：当事人列表按 name 去重，标量字段取第一个非空
+function mergeResults(results: ParsedPleading[]): ParsedPleading {
+  const seen = new Set<string>();
+  const dedupe = (list: PleadingPartyHint[]) => {
+    const out: PleadingPartyHint[] = [];
+    for (const p of list) {
+      const key = p.name?.trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(p);
+    }
+    return out;
+  };
+  return {
+    plaintiffs: dedupe(results.flatMap((r) => r.plaintiffs)),
+    thirdParties: dedupe(results.flatMap((r) => r.thirdParties)),
+    cause: results.find((r) => r.cause)?.cause,
+    claimAmount: results.find((r) => typeof r.claimAmount === "number")?.claimAmount,
+    claimDescription: results.find((r) => r.claimDescription)?.claimDescription,
+    court: results.find((r) => r.court)?.court
+  };
+}
+
 export async function parsePleading(form: FormData): Promise<ParsedPleading> {
   await requireSession();
   const file = form.get("file");
@@ -85,23 +108,47 @@ export async function parsePleading(form: FormData): Promise<ParsedPleading> {
       return normalizeResult(extractJson<ParsedPleading>(content));
     }
 
-    // PDF：服务端抽取文本层 → 文本喂给 AI
+    // PDF：先试文本层抽取（成本低）
     const pdf = await getDocumentProxy(new Uint8Array(buf));
     const { text } = await extractText(pdf, { mergePages: true });
     const cleaned = (Array.isArray(text) ? text.join("\n") : text).trim();
-    if (!cleaned || cleaned.length < 20) {
-      throw new Error(
-        "PDF 无可抽取文本（可能是扫描件）。请用图片格式上传，或先将 PDF 用 OCR 工具转为可搜索 PDF / 图片"
-      );
+
+    if (cleaned && cleaned.length >= 20) {
+      const { content } = await aiChat({
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: `下方为起诉状 / 申请书的全文：\n\n${cleaned.slice(0, 12000)}` }
+        ],
+        maxTokens: 1500
+      });
+      return normalizeResult(extractJson<ParsedPleading>(content));
     }
-    const { content } = await aiChat({
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: `下方为起诉状 / 申请书的全文：\n\n${cleaned.slice(0, 12000)}` }
-      ],
-      maxTokens: 1500
-    });
-    return normalizeResult(extractJson<ParsedPleading>(content));
+
+    // v0.27: 文本层为空（扫描版 PDF）→ 渲染前 3 页为 PNG，逐页 vision 识别后合并
+    const totalPages = pdf.numPages;
+    const pagesToRender = Math.min(totalPages, 3);
+    const canvasImport = () => import("@napi-rs/canvas") as Promise<any>;
+    const pageResults: ParsedPleading[] = [];
+
+    for (let i = 1; i <= pagesToRender; i++) {
+      const arrayBuf = await renderPageAsImage(new Uint8Array(buf), i, {
+        canvasImport,
+        scale: 2.0
+      });
+      const dataUrl = `data:image/png;base64,${Buffer.from(arrayBuf).toString("base64")}`;
+      const { content } = await aiVision({
+        image: { dataUrl },
+        prompt: `${SYSTEM_PROMPT}\n\n（这是扫描版起诉状 / 申请书第 ${i}/${pagesToRender} 页）`,
+        maxTokens: 1500
+      });
+      const parsed = extractJson<ParsedPleading>(content);
+      if (parsed) pageResults.push(normalizeResult(parsed));
+    }
+
+    if (pageResults.length === 0) {
+      throw new Error("扫描版 PDF 识别失败，请改传图片或检查文件");
+    }
+    return mergeResults(pageResults);
   } catch (err) {
     if (err instanceof AiNotConfiguredError) throw err;
     throw new Error(err instanceof Error ? err.message : "OCR 识别失败");

@@ -24,6 +24,7 @@ import cron from "node-cron";
 import { runWeeklyReportPush } from "@/server/reports/push-weekly";
 import { scanArchiveOverdue } from "./jobs/archive-overdue";
 import { runAuditCleanup } from "./jobs/audit-cleanup";
+import { scanDueReminders } from "./jobs/scan-due-reminders";
 import { audit } from "@/server/audit";
 
 const TIMEZONE = "Asia/Shanghai";
@@ -102,7 +103,19 @@ export function registerCronJobs() {
     { timezone: TIMEZONE }
   );
 
+  // v0.27: 每天 09:00 扫到期任务/期限（T-3/T-1/T/T+1 四档），发 DEADLINE_REMINDER
+  cron.schedule(
+    "0 9 * * *",
+    () =>
+      runWithFailureAudit(
+        "到期提醒扫描",
+        "DUE_REMINDER_SCAN_FAILED_CRON",
+        () => scanDueReminders()
+      ),
+    { timezone: TIMEZONE }
+  );
+
   console.log(
-    "[cron] 已注册 3 个定时任务（周报推送 / 归档逾期扫描 / AuditLog 清理），时区 Asia/Shanghai"
+    "[cron] 已注册 4 个定时任务（周报推送 / 归档逾期扫描 / AuditLog 清理 / 到期提醒扫描），时区 Asia/Shanghai"
   );
 }

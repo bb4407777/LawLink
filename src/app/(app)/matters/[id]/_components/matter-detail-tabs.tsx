@@ -270,10 +270,16 @@ export function MatterDetailTabs({
             )}
           </TabButton>
 
-          <TabButton active={tab === "cases"} onClick={() => setTab("cases")}>
-            <Scale className="h-3.5 w-3.5" strokeWidth={1.8} />
-            类案
-          </TabButton>
+          {/*
+            v0.27: 类案 tab 暂时隐藏（功能完整保留在 case-search-panel.tsx，PRD §A3 已说明）。
+            未来开放时去掉此 false 即可。
+          */}
+          {false && (
+            <TabButton active={tab === "cases"} onClick={() => setTab("cases")}>
+              <Scale className="h-3.5 w-3.5" strokeWidth={1.8} />
+              类案
+            </TabButton>
+          )}
 
           <TabButton active={tab === "companies"} onClick={() => setTab("companies")}>
             <Building2 className="h-3.5 w-3.5" strokeWidth={1.8} />
@@ -345,7 +351,8 @@ export function MatterDetailTabs({
               users={colleagues}
             />
           )}
-          {tab === "cases" && (
+          {/* v0.27: 类案 tab 暂时隐藏 */}
+          {false && tab === "cases" && (
             <CaseSearchPanel
               matterId={matter.id}
               matterCategory={matter.category}
