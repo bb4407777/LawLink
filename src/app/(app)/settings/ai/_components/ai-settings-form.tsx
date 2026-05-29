@@ -32,8 +32,8 @@ const PROVIDER_PRESETS = [
   {
     name: "DeepSeek",
     baseUrl: "https://api.deepseek.com/v1",
-    text: "deepseek-chat",
-    vision: "deepseek-chat",
+    text: "deepseek-v4-flash",
+    vision: "deepseek-v4-flash",
     apply: "DeepSeek 平台获取 key",
     link: "https://platform.deepseek.com/api_keys"
   },
