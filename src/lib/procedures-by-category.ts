@@ -44,6 +44,18 @@ export const proceduresByCategory: Record<MatterCategory, ProcedureType[]> = {
     "PROSECUTORIAL_SUPERVISION",
     "CUSTOM"
   ],
+  // 劳动仲裁前置，裁后不服可续一审/二审/再审/执行
+  LABOR_ARBITRATION: [
+    "LABOR_ARBITRATION",
+    "FIRST_INSTANCE",
+    "SECOND_INSTANCE",
+    "RETRIAL_REVIEW",
+    "RETRIAL",
+    "ENFORCEMENT",
+    "CUSTOM"
+  ],
+  // 商事仲裁一裁终局：只有商事仲裁一个程序
+  COMMERCIAL_ARBITRATION: ["COMMERCIAL_ARBITRATION"],
   NON_LITIGATION: ["NON_LITIGATION_PHASE", "CUSTOM"],
   LEGAL_COUNSEL: ["NON_LITIGATION_PHASE", "CUSTOM"],
   SPECIAL_PROJECT: ["NON_LITIGATION_PHASE", "CUSTOM"]
@@ -67,6 +79,14 @@ export const standingsByCategory: Record<MatterCategory, LitigationStanding[]> =
     "CRIMINAL_INCIDENTAL_PLAINTIFF"
   ],
   ADMINISTRATIVE: ["PLAINTIFF", "DEFENDANT", "THIRD_PARTY"],
+  LABOR_ARBITRATION: [
+    "ARBITRATION_CLAIMANT",
+    "ARBITRATION_RESPONDENT",
+    "PLAINTIFF",
+    "DEFENDANT",
+    "THIRD_PARTY"
+  ],
+  COMMERCIAL_ARBITRATION: ["ARBITRATION_CLAIMANT", "ARBITRATION_RESPONDENT", "THIRD_PARTY"],
   NON_LITIGATION: ["NON_LITIGATION_PARTY"],
   LEGAL_COUNSEL: ["NON_LITIGATION_PARTY"],
   SPECIAL_PROJECT: ["NON_LITIGATION_PARTY"]
@@ -94,6 +114,8 @@ export function suggestHandlingAgency(type: ProcedureType): string {
 
 export const matterCategoryCode: Record<MatterCategory, string> = {
   CIVIL_COMMERCIAL: "CC",
+  LABOR_ARBITRATION: "LA",
+  COMMERCIAL_ARBITRATION: "CA",
   CRIMINAL: "CR",
   ADMINISTRATIVE: "AD",
   NON_LITIGATION: "NL",

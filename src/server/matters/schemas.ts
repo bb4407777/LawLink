@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const matterCategorySchema = z.enum([
   "CIVIL_COMMERCIAL",
+  "LABOR_ARBITRATION",
+  "COMMERCIAL_ARBITRATION",
   "CRIMINAL",
   "ADMINISTRATIVE",
   "NON_LITIGATION",

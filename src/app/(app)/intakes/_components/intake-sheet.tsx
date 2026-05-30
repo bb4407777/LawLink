@@ -90,6 +90,8 @@ import { JurisdictionSelect } from "./jurisdiction-select";
 
 const CATEGORIES: MatterCategory[] = [
   "CIVIL_COMMERCIAL",
+  "LABOR_ARBITRATION",
+  "COMMERCIAL_ARBITRATION",
   "CRIMINAL",
   "ADMINISTRATIVE",
   "NON_LITIGATION",
@@ -900,6 +902,7 @@ export function IntakeSheet({
                   <div className="relative">
                     <Input
                       type="date"
+                      className="h-10"
                       value={
                         receivedAt ? new Date(receivedAt).toISOString().split("T")[0] : ""
                       }
@@ -916,6 +919,7 @@ export function IntakeSheet({
                     return (
                       <Input
                         placeholder="留空时自动生成"
+                        className="h-10"
                         {...titleReg}
                         onChange={(e) => {
                           titleReg.onChange(e);

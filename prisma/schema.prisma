@@ -24,12 +24,14 @@ enum UserRole {
 }
 
 enum MatterCategory {
-  CIVIL_COMMERCIAL
-  CRIMINAL
-  ADMINISTRATIVE
-  NON_LITIGATION
-  LEGAL_COUNSEL
-  SPECIAL_PROJECT
+  CIVIL_COMMERCIAL // 民商诉讼
+  LABOR_ARBITRATION // v0.34 劳动仲裁
+  COMMERCIAL_ARBITRATION // v0.34 商事仲裁
+  CRIMINAL // 刑事诉讼
+  ADMINISTRATIVE // 行政诉讼
+  NON_LITIGATION // 非诉项目
+  LEGAL_COUNSEL // 常年顾问
+  SPECIAL_PROJECT // 法律专项
 }
 
 enum MatterStatus {

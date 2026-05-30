@@ -45,6 +45,8 @@ const WSZL_OPTIONS = ["判决书", "裁定书", "调解书", "决定书"] as con
 function ajlbFromCategory(cat: MatterCategory): string | undefined {
   switch (cat) {
     case "CIVIL_COMMERCIAL":
+    case "LABOR_ARBITRATION":
+    case "COMMERCIAL_ARBITRATION":
       return "民事案件";
     case "CRIMINAL":
       return "刑事案件";

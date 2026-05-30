@@ -9,7 +9,9 @@ import { decryptBuffer } from "@/lib/storage/crypto";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: { id: string } }) {
+  // ?inline=1 时以 inline 方式返回，浏览器新标签内预览（PDF/图片/文本），否则下载
+  const inline = new URL(req.url).searchParams.get("inline") === "1";
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
@@ -64,7 +66,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     headers: {
       "Content-Type": doc.mimeType ?? "application/octet-stream",
       "Content-Length": String(buf.byteLength),
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(doc.name)}`
+      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(doc.name)}`
     }
   });
 }

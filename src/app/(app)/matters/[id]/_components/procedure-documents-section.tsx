@@ -169,13 +169,19 @@ export function ProcedureDocumentsSection({
                 className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm"
               >
                 <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate">{d.name}</div>
+                <a
+                  href={`/api/documents/${d.id}/download?inline=1`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="min-w-0 flex-1"
+                  title="点击打开查看"
+                >
+                  <div className="truncate hover:text-primary hover:underline">{d.name}</div>
                   <div className="text-[10px] text-muted-foreground">
                     {categoryLabel[d.category]} · {formatDate(d.createdAt)}
                     {d.size && ` · ${(d.size / 1024).toFixed(0)} KB`}
                   </div>
-                </div>
+                </a>
                 <a
                   href={`/api/documents/${d.id}/download`}
                   target="_blank"

@@ -15,6 +15,8 @@ import type { PrismaClient } from "@prisma/client";
 
 const CATEGORY_SHORT: Record<MatterCategory, string> = {
   CIVIL_COMMERCIAL: "民",
+  LABOR_ARBITRATION: "劳",
+  COMMERCIAL_ARBITRATION: "商",
   CRIMINAL: "刑",
   ADMINISTRATIVE: "行",
   NON_LITIGATION: "非",

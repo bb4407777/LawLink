@@ -67,6 +67,8 @@ type Props = {
 const ALL_CATEGORIES: (MatterCategory | "ALL")[] = [
   "ALL",
   "CIVIL_COMMERCIAL",
+  "LABOR_ARBITRATION",
+  "COMMERCIAL_ARBITRATION",
   "CRIMINAL",
   "ADMINISTRATIVE",
   "NON_LITIGATION",

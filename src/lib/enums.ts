@@ -70,6 +70,7 @@ export type CategoryKind = "litigation" | "project" | "counsel";
 export function matterCategoryKind(c: MatterCategory): CategoryKind {
   if (c === "LEGAL_COUNSEL") return "counsel";
   if (c === "NON_LITIGATION" || c === "SPECIAL_PROJECT") return "project";
+  // 民商诉讼 / 劳动仲裁 / 商事仲裁 / 刑事 / 行政 → 诉讼/仲裁类
   return "litigation";
 }
 
@@ -92,16 +93,20 @@ export const PROJECT_BUSINESS_TYPES: string[] = [
 export const COUNSEL_TYPES: string[] = ["常年法律顾问", "专项法律顾问"];
 
 export const matterCategoryLabel: Record<MatterCategory, string> = {
-  CIVIL_COMMERCIAL: "民商事",
-  CRIMINAL: "刑事",
-  ADMINISTRATIVE: "行政",
-  NON_LITIGATION: "非诉",
-  LEGAL_COUNSEL: "顾问",
-  SPECIAL_PROJECT: "专项"
+  CIVIL_COMMERCIAL: "民商诉讼",
+  LABOR_ARBITRATION: "劳动仲裁",
+  COMMERCIAL_ARBITRATION: "商事仲裁",
+  CRIMINAL: "刑事诉讼",
+  ADMINISTRATIVE: "行政诉讼",
+  NON_LITIGATION: "非诉项目",
+  LEGAL_COUNSEL: "常年顾问",
+  SPECIAL_PROJECT: "法律专项"
 };
 
 export const matterCategoryColor: Record<MatterCategory, string> = {
   CIVIL_COMMERCIAL: "#5B8DEF",
+  LABOR_ARBITRATION: "#34D399",
+  COMMERCIAL_ARBITRATION: "#38BDF8",
   CRIMINAL: "#FB923C",
   ADMINISTRATIVE: "#FBBF24",
   NON_LITIGATION: "#4FD1C5",
@@ -112,10 +117,12 @@ export const matterCategoryColor: Record<MatterCategory, string> = {
 // v0.17: 案件类别单字图标（用于列表卡片标题前）
 export const matterCategoryShort: Record<MatterCategory, string> = {
   CIVIL_COMMERCIAL: "民",
+  LABOR_ARBITRATION: "劳",
+  COMMERCIAL_ARBITRATION: "商",
   CRIMINAL: "刑",
   ADMINISTRATIVE: "行",
   NON_LITIGATION: "非",
-  LEGAL_COUNSEL: "常",
+  LEGAL_COUNSEL: "顾",
   SPECIAL_PROJECT: "专"
 };
 

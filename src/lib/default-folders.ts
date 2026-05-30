@@ -7,6 +7,8 @@ import type { Prisma } from "@prisma/client";
  */
 export const DEFAULT_FOLDERS_BY_CATEGORY: Record<MatterCategory, readonly string[]> = {
   CIVIL_COMMERCIAL: ["收案", "立案", "委托手续", "证据", "程序文书", "庭审", "裁判", "结案"],
+  LABOR_ARBITRATION: ["收案", "委托手续", "证据", "仲裁文书", "开庭", "裁决", "诉讼", "结案"],
+  COMMERCIAL_ARBITRATION: ["收案", "委托手续", "证据", "仲裁文书", "开庭", "裁决", "结案"],
   ADMINISTRATIVE: ["收案", "立案", "委托手续", "证据", "程序文书", "庭审", "裁判", "结案"],
   CRIMINAL: ["收案", "委托手续", "阅卷", "会见", "取证", "庭前", "庭审", "判决与上诉", "结案"],
   NON_LITIGATION: ["立项", "调研", "工作底稿", "出具文件", "归档"],

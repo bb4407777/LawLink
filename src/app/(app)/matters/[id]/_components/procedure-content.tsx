@@ -14,8 +14,7 @@ import type { Deadline, Hearing, MatterStage, MatterProcedure } from "@prisma/cl
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { cn, formatDate, daysUntil } from "@/lib/utils";
-import { procedureTypeLabel } from "@/lib/enums";
+import { cn, daysUntil } from "@/lib/utils";
 import {
   toggleDeadlineCompleted,
   deleteDeadline,
@@ -48,54 +47,7 @@ export function ProcedureContent({ procedure }: { procedure: ProcedureWithChildr
 
   return (
     <div className="space-y-4">
-      {/* 程序信息卡 */}
-      <section
-        className={cn(
-          "rounded-xl border p-5",
-          isInformational
-            ? "border-dashed border-border bg-card"
-            : "border-border bg-card"
-        )}
-      >
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-semibold">
-                {procedure.customLabel ?? procedureTypeLabel[procedure.type]}
-              </h3>
-              {isInformational && (
-                <Badge variant="outline" className="text-[10px]">
-                  前序参考
-                </Badge>
-              )}
-              <Badge variant="outline" className="text-[10px]">
-                {procedure.status === "IN_PROGRESS"
-                  ? "进行中"
-                  : procedure.status === "CONCLUDED"
-                    ? "已结"
-                    : "待启动"}
-              </Badge>
-            </div>
-            {procedure.caseNumber && (
-              <div className="mt-1 font-mono text-xs text-muted-foreground tabular">
-                案号：{procedure.caseNumber}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3 text-xs md:grid-cols-4">
-          <Slot label="办理机关">{procedure.handlingAgency ?? "—"}</Slot>
-          <Slot label="主审 / 仲裁员">{procedure.handler ?? "—"}</Slot>
-          <Slot label="立案日">
-            {procedure.acceptedAt ? formatDate(procedure.acceptedAt) : "—"}
-          </Slot>
-          <Slot label="结案日">
-            {procedure.concludedAt ? formatDate(procedure.concludedAt) : "—"}
-          </Slot>
-        </div>
-      </section>
-
+      {/* 程序基本信息卡已替代原"程序信息卡"，此处只保留期限 / 开庭 */}
       {/* INFORMATIONAL 程序不显示期限、开庭、阶段（按设计） */}
       {!isInformational && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -123,15 +75,6 @@ export function ProcedureContent({ procedure }: { procedure: ProcedureWithChildr
         onOpenChange={setHearingSheetOpen}
         procedureId={procedure.id}
       />
-    </div>
-  );
-}
-
-function Slot({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className="mt-0.5 text-foreground">{children}</div>
     </div>
   );
 }

@@ -122,7 +122,12 @@ export function InfoPanel({
       {/* —— 案件信息：全宽，明暗分栏表格，灵活每行多列 —— */}
       <section className="rounded-lg border border-border bg-card">
         <header className="flex items-center justify-between border-b border-border px-4 py-2">
-          <span className="text-[13px] font-medium">案件信息</span>
+          <span className="text-[13px] font-medium">
+            案件信息
+            <span className="ml-1.5 font-mono text-[11px] font-normal tabular text-muted-foreground/70">
+              丨 {matter.internalCode}
+            </span>
+          </span>
           <Button
             variant="ghost"
             size="sm"
@@ -134,17 +139,12 @@ export function InfoPanel({
           </Button>
         </header>
         <div className="overflow-hidden rounded-b-lg">
-          {/* 行1：系统编号 | 收案时间 | 案件类型 | 案件名称（更宽，整行一行不换行）*/}
+          {/* 行1：收案时间(1/4) | 案件类型(1/4) | 案件名称(1/2) */}
           <InfoRow>
-            <Pair label="系统编号" tight>
-              <span className="font-mono tabular">{matter.internalCode}</span>
-            </Pair>
-            <Pair label="收案时间" tight>
+            <Pair label="收案时间">
               {matter.intakeDate ? formatDate(matter.intakeDate) : "—"}
             </Pair>
-            <Pair label="案件类型" tight>
-              {matterCategoryLabel[matter.category]}
-            </Pair>
+            <Pair label="案件类型">{matterCategoryLabel[matter.category]}</Pair>
             <Pair label="案件名称" grow>
               <span className="font-medium">{matter.title || "—"}</span>
             </Pair>

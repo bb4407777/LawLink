@@ -107,15 +107,10 @@ export function ProcedureInfoPanel({ procedure: p }: { procedure: Proc }) {
           </Pair>
         </InfoRow>
         <InfoRow>
-          <Pair label="立案时间" tight>
-            {p.acceptedAt ? formatDate(p.acceptedAt) : "—"}
-          </Pair>
-          <Pair label="裁决时间" tight>
-            {p.concludedAt ? formatDate(p.concludedAt) : "—"}
-          </Pair>
-          <Pair label="" grow>
-            {" "}
-          </Pair>
+          <Pair label="立案时间">{p.acceptedAt ? formatDate(p.acceptedAt) : "—"}</Pair>
+          <Pair label="裁决时间">{p.concludedAt ? formatDate(p.concludedAt) : "—"}</Pair>
+          {/* 占位：补满后两列，与上方各行 4 列对齐 */}
+          <div className="hidden bg-card md:block md:flex-[2]" />
         </InfoRow>
       </div>
 

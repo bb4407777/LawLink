@@ -7,7 +7,7 @@
  *
  * 渲染产物落到 ARCHIVE/结案/归档 卷宗，category=PROCEDURE，绑定模板 ID（用于审计）。
  */
-import { Prisma, type PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient, type MatterCategory } from "@prisma/client";
 import { storage } from "@/lib/storage";
 import { decryptBuffer, encryptBuffer, sha256 } from "@/lib/storage/crypto";
 import { buildContext, renderDocxBuffer, type RenderContext } from "@/lib/template-engine";
@@ -69,7 +69,7 @@ async function loadBuiltinTemplate(prisma: PrismaClient, key: "archive_cover" | 
 async function findOrCreateArchiveFolder(
   prisma: Pick<PrismaClient, "documentFolder">,
   matterId: string,
-  matterCategory: "CIVIL_COMMERCIAL" | "CRIMINAL" | "ADMINISTRATIVE" | "NON_LITIGATION" | "LEGAL_COUNSEL" | "SPECIAL_PROJECT"
+  matterCategory: MatterCategory
 ): Promise<string> {
   const suggestedName = suggestFolderByTemplateCategory("ARCHIVE", matterCategory) ?? "归档";
   const existing = await prisma.documentFolder.findFirst({
