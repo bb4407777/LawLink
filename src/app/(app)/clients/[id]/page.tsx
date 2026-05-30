@@ -11,17 +11,29 @@ import {
   Tag,
   Star,
   ExternalLink,
-  MessageCircle
+  MessageCircle,
+  Wallet,
+  Coins,
+  Clock,
+  FileText
 } from "lucide-react";
-import { getClientById } from "@/server/clients/actions";
-import { Button } from "@/components/ui/button";
+import { getClientById, getClientFinanceSummary } from "@/server/clients/actions";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { clientTypeLabel, matterCategoryLabel, matterStatusLabel } from "@/lib/enums";
+import { cn } from "@/lib/utils";
+
+const billingStatusLabel: Record<string, string> = {
+  DRAFT: "草稿",
+  ACTIVE: "生效中",
+  CLOSED: "已结"
+};
+const yuan = (n: number) => `¥${n.toLocaleString()}`;
 
 export default async function ClientDetailPage({ params }: { params: { id: string } }) {
   const client = await getClientById(params.id);
   if (!client) notFound();
+  const finance = await getClientFinanceSummary(params.id);
 
   const TypeIcon =
     client.type === "INDIVIDUAL" ? User : client.type === "COMPANY" ? Building2 : Briefcase;
@@ -105,6 +117,14 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
           </>
         )}
       </header>
+
+      {/* 财务概览 */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <FinanceStat icon={<Wallet className="h-4 w-4" />} label="签约合同总额" value={yuan(finance.contractTotal)} accent />
+        <FinanceStat icon={<Coins className="h-4 w-4" />} label="已收款" value={yuan(finance.received)} />
+        <FinanceStat icon={<Clock className="h-4 w-4" />} label="待收款" value={yuan(finance.pending)} />
+        <FinanceStat icon={<Briefcase className="h-4 w-4" />} label="关联案件" value={`${finance.matterCount} 件`} />
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* 联系人 */}
@@ -207,6 +227,81 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
           )}
         </section>
       </div>
+
+      {/* 签约合同 */}
+      <section className="rounded-xl border border-border bg-card p-5">
+        <header className="mb-4 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <FileText className="h-4 w-4 text-primary" />
+            签约合同 <span className="text-muted-foreground">({finance.billings.length})</span>
+          </h2>
+          <span className="text-xs text-muted-foreground">
+            合计 <span className="font-mono tabular text-foreground">{yuan(finance.contractTotal)}</span>
+          </span>
+        </header>
+        {finance.billings.length === 0 ? (
+          <p className="py-6 text-center text-xs text-muted-foreground">暂无签约合同</p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {finance.billings.map((b) => (
+              <li key={b.id}>
+                <Link
+                  href={`/matters/${b.matter.id}`}
+                  className="flex items-center justify-between gap-3 py-3 transition-colors hover:bg-popover"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{b.title}</div>
+                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="font-mono">{b.matter.internalCode}</span>
+                      <span>·</span>
+                      <span className="truncate">{b.matter.title}</span>
+                      {b.signedAt && (
+                        <>
+                          <span>·</span>
+                          <span>{new Date(b.signedAt).toLocaleDateString("zh-CN")}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="font-mono tabular text-sm">{yuan(b.contractAmount)}</span>
+                    <Badge variant="outline" className="text-[10px]">
+                      {billingStatusLabel[b.status] ?? b.status}
+                    </Badge>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function FinanceStat({
+  icon,
+  label,
+  value,
+  accent
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-lg border bg-card px-4 py-3",
+        accent ? "border-primary/30 bg-primary/[0.04]" : "border-border"
+      )}
+    >
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span className={accent ? "text-primary" : ""}>{icon}</span>
+        {label}
+      </div>
+      <div className="mt-1.5 font-mono text-lg font-semibold tabular tracking-tight">{value}</div>
     </div>
   );
 }

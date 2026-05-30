@@ -109,6 +109,61 @@ export async function getClientById(id: string) {
   return client;
 }
 
+// v0.37: 客户财务汇总 —— 跨该客户名下所有案件聚合合同/应收/已收
+export async function getClientFinanceSummary(clientId: string) {
+  const session = await requireSession();
+  // 权限：与 getClientById 一致
+  if (!isManager(session.user.role) && session.user.role !== "FINANCE") {
+    const accessible = await prisma.client.findFirst({
+      where: {
+        id: clientId,
+        deletedAt: null,
+        ...clientVisibilityFilter(session.user.id, session.user.role)
+      },
+      select: { id: true }
+    });
+    if (!accessible) throw new Error("客户不存在");
+  }
+
+  const matterWhere = { primaryClientId: clientId, deletedAt: null };
+  const [billings, fees, matterCount] = await Promise.all([
+    prisma.billing.findMany({
+      where: { matter: matterWhere },
+      include: { matter: { select: { id: true, internalCode: true, title: true } } },
+      orderBy: { createdAt: "desc" }
+    }),
+    prisma.feeEntry.findMany({
+      where: { type: { in: ["RECEIVABLE", "RECEIVED"] }, matter: matterWhere },
+      select: { type: true, amount: true }
+    }),
+    prisma.matter.count({ where: matterWhere })
+  ]);
+
+  const contractTotal = billings.reduce((s, b) => s + Number(b.contractAmount), 0);
+  const receivable = fees
+    .filter((f) => f.type === "RECEIVABLE")
+    .reduce((s, f) => s + Number(f.amount), 0);
+  const received = fees
+    .filter((f) => f.type === "RECEIVED")
+    .reduce((s, f) => s + Number(f.amount), 0);
+
+  return {
+    contractTotal,
+    receivable,
+    received,
+    pending: Math.max(0, receivable - received),
+    matterCount,
+    billings: billings.map((b) => ({
+      id: b.id,
+      title: b.title,
+      status: b.status,
+      contractAmount: Number(b.contractAmount),
+      signedAt: b.signedAt,
+      matter: b.matter
+    }))
+  };
+}
+
 export async function createClient(input: ClientCreateInput) {
   const session = await requireSession();
   const data = clientCreateSchema.parse(input);
