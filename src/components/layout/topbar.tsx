@@ -45,12 +45,12 @@ const roleLabels: Record<string, string> = {
 
 // 应用菜单聚合入口（替代原侧边的 快递/工具/服务中心）
 const APP_ITEMS = [
-  { label: "实务工具", href: "/tools/calc", icon: Calculator },
-  { label: "快递跟踪", href: "/express", icon: Package },
+  { label: "实务工具", href: "/service-center?tab=tools", icon: Calculator },
+  { label: "快递跟踪", href: "/service-center?tab=express", icon: Package },
   { label: "律所文书", href: "/service-center?tab=firm-files", icon: FolderArchive },
   { label: "法律导航", href: "https://yesen.cn", icon: Compass, external: true },
   { label: "公告指引", href: "/service-center?tab=announcements", icon: Megaphone },
-  { label: "制度规范", href: "/service-center?tab=firm-files&cat=POLICY", icon: BookText },
+  { label: "制度规范", href: "/service-center?tab=policy", icon: BookText },
   { label: "通讯录", href: "/service-center?tab=contacts", icon: Contact }
 ] as const;
 

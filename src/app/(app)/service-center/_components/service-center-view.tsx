@@ -10,12 +10,18 @@ import {
   Pin,
   Plus,
   Pencil,
-  Archive
+  Archive,
+  Calculator,
+  Package,
+  Compass,
+  BookText
 } from "lucide-react";
 import type { FirmFileCategory, ExternalContactCategory } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { cn, formatDate } from "@/lib/utils";
 import { FirmFilesView } from "@/app/(app)/firm-resources/_components/firm-files-view";
+import { CalcView } from "@/app/(app)/tools/calc/_components/calc-view";
+import { ExpressView } from "@/app/(app)/express/_components/express-view";
 import { AnnouncementDialog } from "./announcement-dialog";
 import { ExternalContactDialog } from "./external-contact-dialog";
 import { archiveAnnouncement } from "@/server/announcements/actions";
@@ -71,11 +77,15 @@ type ExternalContactItem = {
   createdAt: Date;
 };
 
-type Tab = "announcements" | "firm-files" | "contacts";
+type Tab = "tools" | "express" | "firm-files" | "announcements" | "policy" | "contacts";
 
-const TABS: { key: Tab; label: string; icon: typeof Megaphone }[] = [
-  { key: "announcements", label: "律所公告", icon: Megaphone },
-  { key: "firm-files", label: "制度 / 指引 / 模板", icon: FolderArchive },
+const TABS: { key: Tab | "legal-nav"; label: string; icon: typeof Megaphone; external?: string }[] = [
+  { key: "tools", label: "实务工具", icon: Calculator },
+  { key: "express", label: "快递跟踪", icon: Package },
+  { key: "firm-files", label: "律所文书", icon: FolderArchive },
+  { key: "legal-nav", label: "法律导航", icon: Compass, external: "https://yesen.cn" },
+  { key: "announcements", label: "公告指引", icon: Megaphone },
+  { key: "policy", label: "制度规范", icon: BookText },
   { key: "contacts", label: "通讯录", icon: BookUser }
 ];
 
@@ -101,7 +111,8 @@ export function ServiceCenterView({
   firmFileSearch,
   includeSuperseded,
   colleagues,
-  externalContacts
+  externalContacts,
+  express
 }: {
   currentUserId: string;
   currentUserRole: string;
@@ -114,6 +125,7 @@ export function ServiceCenterView({
   includeSuperseded: boolean;
   colleagues: ColleagueItem[];
   externalContacts: ExternalContactItem[];
+  express: React.ComponentProps<typeof ExpressView>;
 }) {
   const router = useRouter();
   const sp = useSearchParams();
@@ -128,21 +140,37 @@ export function ServiceCenterView({
     <div className="space-y-4">
       <header className="flex items-center justify-between gap-4 border-b border-border pb-3">
         <div>
-          <h1 className="text-base font-medium">服务中心</h1>
-          <p className="text-xs text-muted-foreground">律所公告 · 制度与指引 · 文件模板 · 通讯录</p>
+          <h1 className="text-base font-medium">应用</h1>
+          <p className="text-xs text-muted-foreground">
+            实务工具 · 快递跟踪 · 律所文书 · 公告指引 · 制度规范 · 通讯录
+          </p>
         </div>
       </header>
 
       {/* tabs */}
-      <nav className="flex items-center gap-1 border-b border-border">
+      <nav className="flex flex-wrap items-center gap-1 border-b border-border">
         {TABS.map((t) => {
           const Icon = t.icon;
+          if (t.external) {
+            return (
+              <a
+                key={t.key}
+                href={t.external}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 border-b-2 border-transparent px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <Icon className="h-3.5 w-3.5" strokeWidth={1.8} />
+                {t.label}
+              </a>
+            );
+          }
           const active = tab === t.key;
           return (
             <button
               key={t.key}
               type="button"
-              onClick={() => switchTab(t.key)}
+              onClick={() => switchTab(t.key as Tab)}
               className={cn(
                 "inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] transition-colors",
                 active
@@ -157,6 +185,22 @@ export function ServiceCenterView({
         })}
       </nav>
 
+      {tab === "tools" && <CalcView />}
+
+      {tab === "express" && <ExpressView {...express} />}
+
+      {tab === "firm-files" && (
+        <FirmFilesView
+          files={firmFiles}
+          canUpload={isManager}
+          currentCategory={firmFileCategory}
+          currentSearch={firmFileSearch}
+          includeSuperseded={includeSuperseded}
+          basePath="/service-center"
+          preservedParams={["tab"]}
+        />
+      )}
+
       {tab === "announcements" && (
         <AnnouncementsTab
           items={announcements}
@@ -165,11 +209,12 @@ export function ServiceCenterView({
         />
       )}
 
-      {tab === "firm-files" && (
+      {/* 制度规范 = 律所文书里的「制度(POLICY)」分类 */}
+      {tab === "policy" && (
         <FirmFilesView
-          files={firmFiles}
+          files={firmFiles.filter((f) => f.category === "POLICY")}
           canUpload={isManager}
-          currentCategory={firmFileCategory}
+          currentCategory="POLICY"
           currentSearch={firmFileSearch}
           includeSuperseded={includeSuperseded}
           basePath="/service-center"

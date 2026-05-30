@@ -12,10 +12,13 @@ import { getSession } from "@/lib/auth/session";
 import { listFirmFiles } from "@/server/firm-files/actions";
 import { listAnnouncements } from "@/server/announcements/actions";
 import { listExternalContacts } from "@/server/external-contacts/actions";
+import { listExpress } from "@/server/express/actions";
+import { getExpressSettings } from "@/lib/express/settings";
 import { prisma } from "@/lib/prisma";
 import { ServiceCenterView } from "./_components/service-center-view";
 
 const VALID_CATEGORIES: FirmFileCategory[] = ["POLICY", "GUIDE", "TEMPLATE", "REFERENCE"];
+const VALID_TABS = ["tools", "express", "firm-files", "announcements", "policy", "contacts"];
 
 export default async function ServiceCenterPage({
   searchParams
@@ -25,11 +28,9 @@ export default async function ServiceCenterPage({
   const session = await getSession();
   if (!session?.user) redirect("/login");
 
-  const tab = (() => {
-    const t = searchParams.tab;
-    if (t === "firm-files" || t === "contacts" || t === "announcements") return t;
-    return "announcements";
-  })();
+  const tab = (
+    searchParams.tab && VALID_TABS.includes(searchParams.tab) ? searchParams.tab : "tools"
+  ) as "tools" | "express" | "firm-files" | "announcements" | "policy" | "contacts";
 
   const isManager =
     session.user.role === "ADMIN" || session.user.role === "PRINCIPAL_LAWYER";
@@ -56,6 +57,18 @@ export default async function ServiceCenterPage({
     orderBy: { name: "asc" }
   });
 
+  // 快递跟踪
+  const [expressItems, expressMatters, expressSettings] = await Promise.all([
+    listExpress({ scope: "all", direction: "ALL" }),
+    prisma.matter.findMany({
+      where: { deletedAt: null },
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      select: { id: true, internalCode: true, title: true }
+    }),
+    getExpressSettings()
+  ]);
+
   return (
     <ServiceCenterView
       currentUserId={session.user.id}
@@ -69,6 +82,11 @@ export default async function ServiceCenterPage({
       includeSuperseded={searchParams.includeOld === "1"}
       colleagues={colleagues}
       externalContacts={externalContacts}
+      express={{
+        items: expressItems,
+        matters: expressMatters,
+        configured: expressSettings.kdniao.configured || expressSettings.kuaidi100.configured
+      }}
     />
   );
 }
