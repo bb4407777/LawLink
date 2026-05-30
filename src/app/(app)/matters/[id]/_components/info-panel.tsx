@@ -5,9 +5,10 @@ import { Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   matterCategoryLabel,
-  matterStatusLabel
+  matterStatusLabel,
+  litigationStandingLabel
 } from "@/lib/enums";
-import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import { formatDate, cn } from "@/lib/utils";
 import type { MatterPayload, UserOption, FinancePayload } from "./matter-detail-tabs";
 import { TeamEditorDialog } from "./team-editor-dialog";
 import { PartiesPanel } from "./parties-panel";
@@ -95,63 +96,103 @@ export function InfoPanel({
     ...upcomingTasks
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
+  const coLabel =
+    others.length === 0
+      ? "—"
+      : others
+          .map((m) => `${m.user.name}（${m.role === "CO_LEAD" ? "协办" : "助理"}）`)
+          .join("，");
+  const ourStandingLabel = matter.ourStanding
+    ? litigationStandingLabel[matter.ourStanding]
+    : "—";
+
   return (
     <div className="space-y-4">
-      {/* —— 左：案件信息（dense 两列）；右：近期事件迷你 —— */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <section className="rounded-lg border border-border bg-card lg:col-span-8">
-          <header className="flex items-center justify-between border-b border-border px-4 py-2">
-            <span className="text-[13px] font-medium">案件信息</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTeamEditorOpen(true)}
-              className="h-6 gap-1 text-[11px] text-muted-foreground hover:text-primary"
-            >
-              <Pencil className="h-3 w-3" strokeWidth={1.8} />
-              编辑
-            </Button>
-          </header>
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 px-4 py-3 text-[12.5px] md:grid-cols-2">
-            <Row label="系统编号">
+      {/* —— 案件信息：全宽，明暗分栏表格，灵活每行多列 —— */}
+      <section className="rounded-lg border border-border bg-card">
+        <header className="flex items-center justify-between border-b border-border px-4 py-2">
+          <span className="text-[13px] font-medium">案件信息</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setTeamEditorOpen(true)}
+            className="h-6 gap-1 text-[11px] text-muted-foreground hover:text-primary"
+          >
+            <Pencil className="h-3 w-3" strokeWidth={1.8} />
+            编辑
+          </Button>
+        </header>
+        <div className="overflow-hidden rounded-b-lg">
+          <InfoRow>
+            <Pair label="系统编号">
               <span className="font-mono tabular">{matter.internalCode}</span>
-            </Row>
-            <Row label="收案日">
-              {matter.intakeDate ? formatDate(matter.intakeDate) : "—"}
-            </Row>
-
-            <Row label="案号">
+            </Pair>
+            <Pair label="案件名称" grow>
+              <span className="font-medium">{matter.title || "—"}</span>
+            </Pair>
+            <Pair label="类型">{matterCategoryLabel[matter.category]}</Pair>
+          </InfoRow>
+          <InfoRow>
+            <Pair label="客户" grow>
+              {primaryClientName ?? "—"}
+            </Pair>
+            <Pair label="案号">
               <span className="font-mono tabular">{caseNumber ?? "—"}</span>
-            </Row>
-            <Row label="案由">{matter.cause?.name ?? matter.causeFreeText ?? "—"}</Row>
-
-            <Row label="类型">{matterCategoryLabel[matter.category]}</Row>
-            <Row label="状态">{matterStatusLabel[matter.status]}</Row>
-
-            <Row label="主办律师">{lead ? lead.user.name : "—"}</Row>
-            <Row label="协办">
-              {others.length === 0
-                ? "—"
-                : others.map((m) => `${m.user.name}（${m.role === "CO_LEAD" ? "协办" : "助理"}）`).join("，")}
-            </Row>
-
-            <Row label="委托人">{primaryClientName ?? "—"}</Row>
-            <Row label="对方">
-              {opposingNames.length === 0 ? "—" : opposingNames.join("、")}
-            </Row>
-
-            <Row label="第三人">{thirdNames.length === 0 ? "—" : thirdNames.join("、")}</Row>
-            <Row label="标的">
+            </Pair>
+          </InfoRow>
+          <InfoRow>
+            <Pair label="案由" grow>
+              {matter.cause?.name ?? matter.causeFreeText ?? "—"}
+            </Pair>
+            <Pair label="状态">
+              <span className="inline-flex items-center rounded-sm bg-primary/10 px-1.5 py-0 text-[11px] text-primary">
+                {matterStatusLabel[matter.status]}
+              </span>
+            </Pair>
+          </InfoRow>
+          <InfoRow>
+            <Pair label="收案日">{matter.intakeDate ? formatDate(matter.intakeDate) : "—"}</Pair>
+            <Pair label="我方地位">{ourStandingLabel}</Pair>
+            <Pair label="标的额">
               {matter.claimAmount ? (
-                <span className="font-mono tabular">¥{Number(matter.claimAmount).toLocaleString()}</span>
+                <span className="font-mono tabular">
+                  ¥{Number(matter.claimAmount).toLocaleString()}
+                </span>
               ) : (
                 "—"
               )}
-            </Row>
-          </dl>
-        </section>
+            </Pair>
+          </InfoRow>
+          <InfoRow>
+            <Pair label="主办律师">{lead ? lead.user.name : "—"}</Pair>
+            <Pair label="协办" grow>
+              {coLabel}
+            </Pair>
+          </InfoRow>
+          {opposingNames.length > 0 && (
+            <InfoRow>
+              <Pair label="相对方" grow>
+                {opposingNames.join("、")}
+              </Pair>
+            </InfoRow>
+          )}
+          {thirdNames.length > 0 && (
+            <InfoRow>
+              <Pair label="第三人" grow>
+                {thirdNames.join("、")}
+              </Pair>
+            </InfoRow>
+          )}
+        </div>
+      </section>
 
-        {/* —— 右：重要时限及提醒 mini —— */}
+      {/* —— 下：案件当事人（左，列表）+ 重要时限（右）—— */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <div className="lg:col-span-8">
+          <PartiesPanel matter={matter} />
+        </div>
+
+        {/* —— 重要时限及提醒 mini —— */}
         <section className="rounded-lg border border-border bg-card lg:col-span-4">
           <header className="flex items-center justify-between border-b border-border px-4 py-2">
             <span className="text-[13px] font-medium">
@@ -223,11 +264,6 @@ export function InfoPanel({
         </section>
       </div>
 
-      {/* —— 参与方（仅在有相对方时显示，否则上面"对方/第三人"已经覆盖）—— */}
-      {(opposingNames.length > 0 || thirdNames.length > 0 || matter.clientLinks.length > 1) && (
-        <PartiesPanel matter={matter} />
-      )}
-
       <TeamEditorDialog
         open={teamEditorOpen}
         onOpenChange={setTeamEditorOpen}
@@ -264,11 +300,33 @@ export function InfoPanel({
 
 /* —— Sub-components —— */
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+// 一行：移动端纵向堆叠（pair 间横线），md+ 横向排列（pair 间竖线）
+function InfoRow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-baseline gap-2 py-0.5">
-      <dt className="w-24 shrink-0 text-[11.5px] text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 flex-1 truncate text-foreground/95">{children}</dd>
+    <div className="flex flex-col divide-y divide-border border-b border-border last:border-b-0 md:flex-row md:divide-x md:divide-y-0">
+      {children}
+    </div>
+  );
+}
+
+// 一个标签-取值对：标签灰底（暗），取值白底（亮）
+function Pair({
+  label,
+  grow,
+  children
+}: {
+  label: string;
+  grow?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={cn("flex min-w-0", grow ? "md:flex-[2.4]" : "md:flex-1")}>
+      <div className="w-[84px] shrink-0 border-r border-border bg-muted/50 px-3 py-2 text-[11.5px] leading-snug text-muted-foreground">
+        {label}
+      </div>
+      <div className="min-w-0 flex-1 break-words bg-card px-3 py-2 text-[12.5px] leading-snug text-foreground/95">
+        {children}
+      </div>
     </div>
   );
 }

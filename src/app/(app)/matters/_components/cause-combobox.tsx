@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useTransition } from "react";
-import { Check, ChevronRight, ChevronsUpDown, Loader2, X } from "lucide-react";
+import { ChevronRight, ChevronsUpDown, Loader2, X } from "lucide-react";
 import type { MatterCategory } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,10 +23,12 @@ type Props = {
 };
 
 /**
- * v0.16: 案由级联选择器（参考用户提供的 cascade 截图）
- * - 一次性拉本 category 全部案由（level 1-4）
- * - 4 列级联：诉讼类型 / 一级 / 二级 / 三级（带四级）
- * - 顶部搜索可跨级搜索；选中后自动定位到对应层级
+ * 案由级联选择器
+ * - 一次性拉本 category 全部案由
+ * - 去掉一级，从二级起级联：二级 / 三级 / 四级，渐进展开（选了上一级才出现下一列）
+ * - 单击即选：有子级 → 展开下一列；无子级（叶子）→ 直接选中。两次点击可选到常见三级案由。
+ * - 列宽收窄，弹层随列数增长，避免一打开就铺满整页
+ * - 名称过长截断，hover 显示全名
  */
 export function CauseCombobox({ value, onChange, category, disabled }: Props) {
   const [open, setOpen] = useState(false);
@@ -35,7 +37,6 @@ export function CauseCombobox({ value, onChange, category, disabled }: Props) {
   const [selectedName, setSelectedName] = useState<string>("");
   const [selectedL2, setSelectedL2] = useState<string | null>(null);
 
-  const [pickedL1, setPickedL1] = useState<string | null>(null);
   const [pickedL2, setPickedL2] = useState<string | null>(null);
   const [pickedL3, setPickedL3] = useState<string | null>(null);
 
@@ -52,7 +53,6 @@ export function CauseCombobox({ value, onChange, category, disabled }: Props) {
     }
     if (o) {
       // 重置 picked 状态（避免上次残留）
-      setPickedL1(null);
       setPickedL2(null);
       setPickedL3(null);
       setSearchInput("");
@@ -81,11 +81,8 @@ export function CauseCombobox({ value, onChange, category, disabled }: Props) {
     }
   }, [value, allNodes]);
 
-  const l1Nodes = useMemo(() => allNodes.filter((n) => n.level === 1), [allNodes]);
-  const l2Nodes = useMemo(
-    () => (pickedL1 ? allNodes.filter((n) => n.level === 2 && n.parentId === pickedL1) : []),
-    [allNodes, pickedL1]
-  );
+  // 去掉一级：二级直接平铺为第一列
+  const l2Nodes = useMemo(() => allNodes.filter((n) => n.level === 2), [allNodes]);
   const l3Nodes = useMemo(
     () => (pickedL2 ? allNodes.filter((n) => n.level === 3 && n.parentId === pickedL2) : []),
     [allNodes, pickedL2]
@@ -104,6 +101,10 @@ export function CauseCombobox({ value, onChange, category, disabled }: Props) {
       .filter((n) => n.level >= 3 && n.name.toLowerCase().includes(lower))
       .slice(0, 60);
   }, [allNodes, searchInput]);
+
+  function hasChildren(n: Node) {
+    return allNodes.some((x) => x.parentId === n.id);
+  }
 
   function pickNode(node: Node) {
     onChange(node.id, node.name);
@@ -136,15 +137,12 @@ export function CauseCombobox({ value, onChange, category, disabled }: Props) {
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent
-        className="w-[--radix-popover-trigger-width] min-w-[820px] p-0"
-        align="start"
-      >
+      <PopoverContent className="w-auto max-w-[92vw] p-0" align="start">
         {/* 搜索栏 */}
         <div className="border-b border-border p-2">
-          <div className="relative">
+          <div className="relative w-[240px]">
             <Input
-              placeholder="搜索（跨级模糊匹配）或在下方按层级浏览"
+              placeholder="搜索案由，或下方逐级浏览"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               className="h-8 pr-7 text-xs"
@@ -162,13 +160,13 @@ export function CauseCombobox({ value, onChange, category, disabled }: Props) {
         </div>
 
         {isPending ? (
-          <div className="flex items-center justify-center py-10 text-xs text-muted-foreground">
+          <div className="flex w-[240px] items-center justify-center py-10 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <span className="ml-2">加载案由库...</span>
           </div>
         ) : searchMatched ? (
           // 搜索模式：扁平结果带路径
-          <div className="max-h-[360px] overflow-y-auto p-1">
+          <div className="max-h-[360px] w-[320px] overflow-y-auto p-1">
             {searchMatched.length === 0 ? (
               <p className="py-6 text-center text-xs text-muted-foreground">未找到匹配</p>
             ) : (
@@ -177,11 +175,12 @@ export function CauseCombobox({ value, onChange, category, disabled }: Props) {
                   key={n.id}
                   type="button"
                   onClick={() => pickNode(n)}
+                  title={n.name}
                   className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-[12.5px] hover:bg-muted/60"
                 >
                   <span className="truncate">{n.name}</span>
                   <span className="shrink-0 text-[10.5px] text-muted-foreground">
-                    {[n.l1Name, n.l2Name].filter(Boolean).join(" / ")}
+                    {n.l2Name ?? ""}
                   </span>
                 </button>
               ))
@@ -189,60 +188,36 @@ export function CauseCombobox({ value, onChange, category, disabled }: Props) {
           </div>
         ) : (
           // 级联模式：渐进展开（选了上一级才出现下一列）
-          // 行点 = 展开下一级；行尾 ✓ = 直接选用本级（允许在任意层级落点）
+          // 单击：有子级 → 展开下一列；叶子 → 直接选中
           <div className="flex divide-x divide-border">
             <Column
-              title="一级"
-              items={l1Nodes}
-              activeId={pickedL1}
-              hasChildren={(n) => allNodes.some((x) => x.level === 2 && x.parentId === n.id)}
+              title="二级"
+              items={l2Nodes}
+              activeId={pickedL2}
+              hasChildren={hasChildren}
               onPick={(n) => {
-                setPickedL1(n.id);
-                setPickedL2(null);
-                setPickedL3(null);
+                if (hasChildren(n)) {
+                  setPickedL2(n.id);
+                  setPickedL3(null);
+                } else {
+                  pickNode(n);
+                }
               }}
-              onSelect={pickNode}
             />
-            {pickedL1 && (
-              <Column
-                title="二级"
-                items={l2Nodes}
-                activeId={pickedL2}
-                empty="该一级下无二级"
-                hasChildren={(n) => allNodes.some((x) => x.level === 3 && x.parentId === n.id)}
-                onPick={(n) => {
-                  // 没有三级 → 直接选中
-                  const hasChildren = allNodes.some(
-                    (x) => x.level === 3 && x.parentId === n.id
-                  );
-                  if (hasChildren) {
-                    setPickedL2(n.id);
-                    setPickedL3(null);
-                  } else {
-                    pickNode(n);
-                  }
-                }}
-                onSelect={pickNode}
-              />
-            )}
             {pickedL2 && (
               <Column
                 title="三级"
                 items={l3Nodes}
                 activeId={pickedL3}
                 empty="该二级下无三级"
-                hasChildren={(n) => allNodes.some((x) => x.level === 4 && x.parentId === n.id)}
+                hasChildren={hasChildren}
                 onPick={(n) => {
-                  const hasChildren = allNodes.some(
-                    (x) => x.level === 4 && x.parentId === n.id
-                  );
-                  if (hasChildren) {
+                  if (hasChildren(n)) {
                     setPickedL3(n.id);
                   } else {
                     pickNode(n);
                   }
                 }}
-                onSelect={pickNode}
               />
             )}
             {pickedL3 && l4Nodes.length > 0 && (
@@ -267,9 +242,7 @@ function Column({
   activeId,
   empty = "—",
   hasChildren,
-  onPick,
-  onSelect,
-  className
+  onPick
 }: {
   title: string;
   items: Node[];
@@ -277,12 +250,9 @@ function Column({
   empty?: string;
   hasChildren: (n: Node) => boolean;
   onPick: (n: Node) => void;
-  // 有子级的节点显示"✓"按钮 → 直接选用本级，跳过下一级
-  onSelect?: (n: Node) => void;
-  className?: string;
 }) {
   return (
-    <div className={cn("flex max-h-[360px] flex-col", className)}>
+    <div className="flex max-h-[360px] w-[176px] flex-col">
       <div className="border-b border-border bg-muted/30 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
         {title}
       </div>
@@ -294,46 +264,25 @@ function Column({
             const branching = hasChildren(n);
             const isActive = activeId === n.id;
             return (
-              <div
+              <button
                 key={n.id}
+                type="button"
+                onClick={() => onPick(n)}
+                title={n.name}
                 className={cn(
-                  "group/row flex items-stretch rounded transition-colors",
+                  "flex w-full items-center justify-between gap-1 rounded px-2 py-1.5 text-left text-[12.5px] transition-colors",
                   isActive ? "bg-primary/15 text-primary" : "hover:bg-muted/60"
                 )}
               >
-                <button
-                  type="button"
-                  onClick={() => onPick(n)}
-                  title={branching ? "展开下一级" : "选用"}
-                  className="flex flex-1 items-center justify-between gap-1 px-2 py-1.5 text-left text-[12.5px]"
-                >
-                  <span className="truncate">{n.name}</span>
-                  <ChevronRight
-                    className={cn(
-                      "h-3 w-3 shrink-0 text-muted-foreground/50",
-                      isActive && "text-primary",
-                      !branching && "invisible"
-                    )}
-                  />
-                </button>
-                {branching && onSelect && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelect(n);
-                    }}
-                    title="直接选用本级（不下钻）"
-                    className={cn(
-                      "flex items-center justify-center rounded-r px-1.5 text-[10px] text-muted-foreground transition-colors",
-                      "opacity-0 hover:bg-primary/20 hover:text-primary",
-                      "group-hover/row:opacity-100 focus-visible:opacity-100"
-                    )}
-                  >
-                    <Check className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
+                <span className="truncate">{n.name}</span>
+                <ChevronRight
+                  className={cn(
+                    "h-3 w-3 shrink-0 text-muted-foreground/50",
+                    isActive && "text-primary",
+                    !branching && "invisible"
+                  )}
+                />
+              </button>
             );
           })
         )}

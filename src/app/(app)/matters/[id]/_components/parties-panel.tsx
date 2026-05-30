@@ -1,95 +1,76 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, Phone, MapPin, IdCard, User } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ChevronRight, IdCard, Phone, MapPin, UserCog } from "lucide-react";
 import { clientTypeLabel, litigationStandingLabel } from "@/lib/enums";
 import { cn } from "@/lib/utils";
 import type { MatterPayload } from "./matter-detail-tabs";
 
 type PartyRow = MatterPayload["parties"][number];
 
+const ROLE_STYLE: Record<string, { label: string; cls: string }> = {
+  CLIENT: { label: "客户", cls: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
+  OPPOSING_PARTY: { label: "相对方", cls: "bg-orange-500/10 text-orange-600 border-orange-500/20" },
+  THIRD_PARTY: { label: "第三人", cls: "bg-violet-500/10 text-violet-600 border-violet-500/20" }
+};
+
 export function PartiesPanel({ matter }: { matter: MatterPayload }) {
-  const ourSide = matter.parties.filter((p) => p.role === "CLIENT_PARTY");
   const opposing = matter.parties.filter((p) => p.role === "OPPOSING_PARTY");
   const thirdParty = matter.parties.filter((p) => p.role === "THIRD_PARTY");
+  const clientParties = matter.parties.filter((p) => p.role === "CLIENT_PARTY");
 
-  // 只渲染有内容的列，空列直接跳过
-  const cols: { title: string; accent: string; items: React.ReactNode[] }[] = [];
-
-  const clientItems: React.ReactNode[] = [
-    ...matter.clientLinks.map((cl) => (
-      <ClientCard
-        key={cl.clientId}
-        name={cl.client.name}
-        typeLabel={clientTypeLabel[cl.client.type]}
-        href={`/clients/${cl.client.id}`}
-        primary={cl.isPrimary}
-      />
-    )),
-    ...ourSide.map((p) => <PartyCard key={p.id} party={p} />)
-  ];
-  if (clientItems.length > 0) {
-    cols.push({ title: "委托方", accent: "#5B8DEF", items: clientItems });
-  }
-  if (opposing.length > 0) {
-    cols.push({
-      title: "对方",
-      accent: "#FB923C",
-      items: opposing.map((p) => <PartyCard key={p.id} party={p} />)
-    });
-  }
-  if (thirdParty.length > 0) {
-    cols.push({
-      title: "第三人",
-      accent: "#9B7BF7",
-      items: thirdParty.map((p) => <PartyCard key={p.id} party={p} />)
-    });
-  }
-
-  if (cols.length === 0) return null;
+  const total = matter.clientLinks.length + clientParties.length + opposing.length + thirdParty.length;
+  if (total === 0) return null;
 
   return (
     <section className="rounded-lg border border-border bg-card">
-      <header className="border-b border-border px-4 py-2 text-[13px] font-medium">参与方</header>
-      <div
-        className={cn(
-          "grid grid-cols-1 gap-3 p-3",
-          cols.length === 2 && "md:grid-cols-2",
-          cols.length === 3 && "md:grid-cols-3"
-        )}
-      >
-        {cols.map((c) => (
-          <Column key={c.title} title={c.title} accent={c.accent}>
-            {c.items}
-          </Column>
+      <header className="flex items-center justify-between border-b border-border px-4 py-2">
+        <span className="text-[13px] font-medium">
+          案件当事人
+          <span className="ml-1 text-[11px] text-muted-foreground">({total})</span>
+        </span>
+      </header>
+      <ul className="divide-y divide-border">
+        {/* 委托方：CRM 客户（可点开）*/}
+        {matter.clientLinks.map((cl) => (
+          <ClientLinkRow
+            key={`cl-${cl.clientId}`}
+            name={cl.client.name}
+            typeLabel={clientTypeLabel[cl.client.type]}
+            href={`/clients/${cl.client.id}`}
+            primary={cl.isPrimary}
+          />
         ))}
-      </div>
+        {/* 委托方：非 CRM 录入的当事人 */}
+        {clientParties.map((p) => (
+          <PartyRowItem key={p.id} party={p} roleKey="CLIENT" />
+        ))}
+        {opposing.map((p) => (
+          <PartyRowItem key={p.id} party={p} roleKey="OPPOSING_PARTY" />
+        ))}
+        {thirdParty.map((p) => (
+          <PartyRowItem key={p.id} party={p} roleKey="THIRD_PARTY" />
+        ))}
+      </ul>
     </section>
   );
 }
 
-function Column({
-  title,
-  accent,
-  children
-}: {
-  title: string;
-  accent: string;
-  children: React.ReactNode;
-}) {
+function RoleTag({ roleKey }: { roleKey: string }) {
+  const s = ROLE_STYLE[roleKey] ?? ROLE_STYLE.OPPOSING_PARTY;
   return (
-    <div>
-      <div className="mb-1.5 flex items-center gap-1.5">
-        <span className="h-1 w-1 rounded-full" style={{ backgroundColor: accent }} />
-        <h3 className="text-[10.5px] font-medium tracking-wider text-muted-foreground">{title}</h3>
-      </div>
-      <div className="space-y-1.5">{children}</div>
-    </div>
+    <span
+      className={cn(
+        "inline-flex h-5 shrink-0 items-center rounded border px-1.5 text-[10.5px] font-medium",
+        s.cls
+      )}
+    >
+      {s.label}
+    </span>
   );
 }
 
-function ClientCard({
+function ClientLinkRow({
   name,
   typeLabel,
   href,
@@ -101,54 +82,62 @@ function ClientCard({
   primary: boolean;
 }) {
   return (
-    <Link
-      href={href}
-      className="group flex items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 transition-colors hover:bg-muted/30"
-    >
-      <User className="h-3 w-3 shrink-0 text-muted-foreground" strokeWidth={1.8} />
-      <span className="truncate text-[12.5px] font-medium">{name}</span>
-      <span className="text-[10.5px] text-muted-foreground">· {typeLabel}</span>
-      {primary && <Badge variant="secondary" className="ml-auto h-4 px-1 text-[9.5px]">主</Badge>}
-      <ChevronRight className="ml-auto h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-    </Link>
+    <li>
+      <Link
+        href={href}
+        className="group flex items-center gap-2.5 px-4 py-2.5 transition-colors hover:bg-muted/30"
+      >
+        <RoleTag roleKey="CLIENT" />
+        <span className="truncate text-[13px] font-medium">{name}</span>
+        <span className="shrink-0 text-[11px] text-muted-foreground">· {typeLabel}</span>
+        {primary && (
+          <span className="shrink-0 rounded-sm bg-blue-500/10 px-1 text-[9.5px] text-blue-600">主</span>
+        )}
+        <ChevronRight className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+      </Link>
+    </li>
   );
 }
 
-function PartyCard({ party }: { party: PartyRow }) {
+function PartyRowItem({ party, roleKey }: { party: PartyRow; roleKey: string }) {
+  const isOrg = party.partyType === "ORGANIZATION";
   const standing = party.standing ? litigationStandingLabel[party.standing] : null;
-  const hasExtra = party.idNumber || party.phone || party.address;
+  const idValue = isOrg ? party.enterpriseSocialCode : party.idNumber;
+  const typeLabel = isOrg ? "单位" : "自然人";
+
+  const details: { icon: React.ReactNode; text: string; mono?: boolean }[] = [];
+  if (idValue) details.push({ icon: <IdCard className="h-3 w-3" />, text: idValue, mono: true });
+  if (isOrg && party.legalRep)
+    details.push({ icon: <UserCog className="h-3 w-3" />, text: `法定代表人 ${party.legalRep}` });
+  if (party.phone) details.push({ icon: <Phone className="h-3 w-3" />, text: party.phone, mono: true });
+  if (party.address) details.push({ icon: <MapPin className="h-3 w-3" />, text: party.address });
+
   return (
-    <div className="rounded-md border border-border bg-background px-2.5 py-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-[12.5px] font-medium">{party.name || "—"}</span>
-        {standing && (
-          <span className="shrink-0 rounded border border-border px-1 py-0 text-[9.5px] text-muted-foreground">
-            {standing}
-          </span>
-        )}
-      </div>
-      {hasExtra && (
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] text-muted-foreground">
-          {party.idNumber && (
-            <span className="flex items-center gap-1">
-              <IdCard className="h-2.5 w-2.5" />
-              <span className="font-mono truncate" title={party.idNumber}>{party.idNumber}</span>
-            </span>
-          )}
-          {party.phone && (
-            <span className="flex items-center gap-1">
-              <Phone className="h-2.5 w-2.5" />
-              <span className="font-mono">{party.phone}</span>
-            </span>
-          )}
-          {party.address && (
-            <span className="flex items-center gap-1">
-              <MapPin className="h-2.5 w-2.5" />
-              <span className="truncate" title={party.address}>{party.address}</span>
+    <li className="flex items-start gap-2.5 px-4 py-2.5">
+      <RoleTag roleKey={roleKey} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-[13px] font-medium">{party.name || "—"}</span>
+          <span className="shrink-0 text-[11px] text-muted-foreground">· {typeLabel}</span>
+          {standing && (
+            <span className="ml-auto shrink-0 rounded border border-border px-1.5 py-0 text-[10px] text-muted-foreground">
+              {standing}
             </span>
           )}
         </div>
-      )}
-    </div>
+        {details.length > 0 && (
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+            {details.map((d, i) => (
+              <span key={i} className="flex min-w-0 items-center gap-1">
+                <span className="shrink-0 text-muted-foreground/70">{d.icon}</span>
+                <span className={cn("truncate", d.mono && "font-mono")} title={d.text}>
+                  {d.text}
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </li>
   );
 }

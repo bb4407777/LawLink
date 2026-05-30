@@ -29,7 +29,8 @@ export function ClientCombobox({
   onPickExisting,
   onTypeNew,
   onPickYuandian,
-  onClear
+  onClear,
+  triggerClassName
 }: {
   clientId: string;
   clientName: string;
@@ -39,6 +40,7 @@ export function ClientCombobox({
   onTypeNew: (name: string) => void;
   onPickYuandian: (candidate: YuandianCandidate) => void;
   onClear: () => void;
+  triggerClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -117,6 +119,7 @@ export function ClientCombobox({
           aria-expanded={open}
           className={cn(
             "h-10 w-full justify-between font-normal",
+            triggerClassName,
             !display && "text-muted-foreground"
           )}
         >

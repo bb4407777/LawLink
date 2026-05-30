@@ -1,17 +1,16 @@
 "use client";
 
 /**
- * v0.28: 案件当事人卡片（matter-sheet / intake-sheet 共用）
+ * 案件当事人表格行（intake-sheet 专用）
  *
- * 紧凑化改版（对照"案件云"一行一当事人的版面）：
- * - 头部一行：标签 + 类型切换（自然人/公司）+ headerExtra（诉讼地位）+ 删除
- * - 核心字段常驻：姓名/名称 + 必填证件（身份证号 / 统一社会信用代码 + AI 查找）
- * - 次要字段（电话 / 地址 / 联系人 / 备注 / 法代）折叠，点"更多"展开
- * - AI 企业候选改用 Popover 浮层，不再内联撑高卡片
- * - 选中候选自动回填并展开次要字段，便于核对法代/地址
+ * 参考"案件云"建案表单的当事人表格：一行一当事人，列对齐，次要字段折叠。
+ * 列：角色 | 类型 | 姓名/名称 | 诉讼地位 | 证件号/信用代码 | 操作
+ * - 角色 / 诉讼地位两列由调用方注入（roleSlot / standingSlot），本组件不关心其取值逻辑
+ * - 类型（自然人 / 单位）、证件（身份证号 / 统一社会信用代码 + AI 查找）、展开次要字段、删除由本组件负责
+ * - 次要字段（法代 / 电话 / 联系人 / 地址 / 备注）默认折叠，点"更多"在行下方展开
  *
- * partyType 切换：自然人 / 公司
- * 自然人必填：身份证号；公司必填：统一社会信用代码
+ * PARTY_GRID 同时给表头与每一行使用，保证列对齐。
+ *
  * 校验落在 zod superRefine（partyInputSchema）；本组件只负责 UI + 字段联动。
  */
 import { useState, useTransition, type ReactNode } from "react";
@@ -20,6 +19,13 @@ import { ChevronDown, Loader2, Search, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import {
@@ -28,14 +34,19 @@ import {
   type EnterpriseSearchItem
 } from "@/server/yuandian/enterprise";
 
+/** 表头与每一行共用，保证列对齐 */
+export const PARTY_GRID =
+  "grid grid-cols-[72px_84px_minmax(0,1.2fr)_108px_minmax(0,1.5fr)_52px] items-center gap-1.5";
+
 type Props = {
   index: number;
   fieldPrefix: string; // e.g. "parties"
-  label: string;       // 显示头："对方 1" / "第三人 2"
   onRemove: () => void;
   errors?: FieldErrors<Record<string, unknown>>;
-  /** 头部右侧额外 slot，常用于 intake 流程的角色 / 诉讼地位下拉 */
-  headerExtra?: ReactNode;
+  /** 角色单元格内容（委托方徽标 / 对方·第三人下拉） */
+  roleSlot: ReactNode;
+  /** 诉讼地位单元格内容 */
+  standingSlot: ReactNode;
   /** false 时隐藏删除按钮（如委托方行恒存在）。默认 true */
   removable?: boolean;
   /** 提供时替换内置"姓名/名称"输入框（如委托方行注入客户选择器）。 */
@@ -45,10 +56,10 @@ type Props = {
 export function PartyCard({
   index,
   fieldPrefix,
-  label,
   onRemove,
   errors,
-  headerExtra,
+  roleSlot,
+  standingSlot,
   removable = true,
   nameSlot
 }: Props) {
@@ -61,7 +72,7 @@ export function PartyCard({
   const [filling, startFill] = useTransition();
   const [expanded, setExpanded] = useState(false);
 
-  // 次要字段是否已有内容（折叠态给个小提示，避免"藏了东西看不见"）
+  // 次要字段是否已有内容（折叠态给个小提示）
   const secondaryFilled = [
     watch(`${p}.phone`),
     watch(`${p}.address`),
@@ -136,175 +147,166 @@ export function PartyCard({
   }
 
   const fieldErr = (errors as any)?.[fieldPrefix]?.[index] ?? {};
+  const idErr = partyType === "NATURAL_PERSON" ? fieldErr.idNumber : fieldErr.enterpriseSocialCode;
 
   return (
-    <div className="rounded-lg border border-border bg-background px-3 py-2.5">
-      {/* 头部：标签 + 类型切换 + headerExtra + 删除 */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <span className="shrink-0 text-xs font-medium text-muted-foreground">{label}</span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => changeType("NATURAL_PERSON")}
-              className={cn(
-                "rounded-md border px-2 py-0.5 text-[11px] transition-colors",
-                partyType === "NATURAL_PERSON"
-                  ? "border-primary bg-primary/15 text-primary"
-                  : "border-border bg-background text-muted-foreground hover:border-input"
-              )}
-            >
+    <div className="rounded-md border border-border bg-background">
+      <div className={cn(PARTY_GRID, "px-2 py-1.5")}>
+        {/* 角色 */}
+        <div className="min-w-0">{roleSlot}</div>
+
+        {/* 类型 */}
+        <Select value={partyType} onValueChange={(v) => changeType(v as typeof partyType)}>
+          <SelectTrigger className="h-8 bg-background px-2 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="NATURAL_PERSON" className="text-xs">
               自然人
-            </button>
-            <button
-              type="button"
-              onClick={() => changeType("ORGANIZATION")}
-              className={cn(
-                "rounded-md border px-2 py-0.5 text-[11px] transition-colors",
-                partyType === "ORGANIZATION"
-                  ? "border-primary bg-primary/15 text-primary"
-                  : "border-border bg-background text-muted-foreground hover:border-input"
-              )}
-            >
-              公司 / 组织
-            </button>
-          </div>
-          {headerExtra}
+            </SelectItem>
+            <SelectItem value="ORGANIZATION" className="text-xs">
+              单位
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* 姓名 / 名称 */}
+        <div className="min-w-0">
+          {nameSlot ?? (
+            <Input
+              className="h-8 text-sm"
+              placeholder={partyType === "ORGANIZATION" ? "公司 / 组织名称" : "姓名"}
+              {...register(`${p}.name`)}
+            />
+          )}
         </div>
-        {removable && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onRemove}
-            className="h-6 w-6 shrink-0 p-0 text-destructive"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        )}
-      </div>
 
-      {/* 核心字段（常驻）：姓名/名称 + 必填证件 */}
-      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {nameSlot ? (
-          <div className="sm:col-span-1">{nameSlot}</div>
-        ) : (
-          <Input
-            className="sm:col-span-1"
-            placeholder={partyType === "ORGANIZATION" ? "公司 / 组织名称" : "姓名"}
-            {...register(`${p}.name`)}
-          />
-        )}
+        {/* 诉讼地位 */}
+        <div className="min-w-0">{standingSlot}</div>
 
-        {partyType === "NATURAL_PERSON" ? (
-          <Input
-            placeholder="身份证号（必填）"
-            className={cn("font-mono", fieldErr.idNumber && "border-destructive")}
-            {...register(`${p}.idNumber`)}
-          />
-        ) : (
-          <div className="flex gap-1">
+        {/* 证件号 / 信用代码 */}
+        <div className="flex min-w-0 items-center gap-1">
+          {partyType === "NATURAL_PERSON" ? (
             <Input
-              placeholder="统一社会信用代码（必填）"
-              className={cn("flex-1 font-mono", fieldErr.enterpriseSocialCode && "border-destructive")}
-              {...register(`${p}.enterpriseSocialCode`)}
+              placeholder="身份证号（必填）"
+              className={cn("h-8 font-mono text-xs", idErr && "border-destructive")}
+              {...register(`${p}.idNumber`)}
             />
-            <Popover
-              open={!!candidates && candidates.length > 0}
-              onOpenChange={(o) => {
-                if (!o) setCandidates(null);
-              }}
-            >
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAILookup}
-                  disabled={searching || filling}
-                  className="h-9 shrink-0 gap-1"
-                  title="按公司名称在元典搜索 → 自动回填信用代码 + 法代 + 地址"
-                >
-                  {searching ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3 w-3" />
-                  )}
-                  AI 查找
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-72 p-1.5">
-                <div className="mb-1 flex items-center gap-1 px-1 text-[10px] text-muted-foreground">
-                  <Search className="h-3 w-3" />
-                  共 {candidates?.length ?? 0} 条候选，点击回填
-                </div>
-                <ul className="max-h-64 space-y-1 overflow-y-auto">
-                  {candidates?.map((c) => (
-                    <li key={c.id}>
-                      <button
-                        type="button"
-                        onClick={() => handlePickCandidate(c)}
-                        disabled={filling}
-                        className="w-full rounded border border-border bg-background px-2 py-1.5 text-left text-xs hover:border-primary disabled:opacity-50"
-                      >
-                        <div className="font-medium">{c.name}</div>
-                        <div className="font-mono text-[10px] text-muted-foreground">{c.creditCode}</div>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </PopoverContent>
-            </Popover>
-          </div>
-        )}
-
-        {/* 必填项错误（折叠态也要可见） */}
-        {fieldErr.idNumber && partyType === "NATURAL_PERSON" && (
-          <p className="text-[10px] text-destructive sm:col-span-2">
-            {fieldErr.idNumber.message as string}
-          </p>
-        )}
-        {fieldErr.enterpriseSocialCode && partyType === "ORGANIZATION" && (
-          <p className="text-[10px] text-destructive sm:col-span-2">
-            {fieldErr.enterpriseSocialCode.message as string}
-          </p>
-        )}
-
-        {/* 次要字段（折叠） */}
-        {expanded && (
-          <>
-            {partyType === "ORGANIZATION" && (
-              <Input placeholder="法定代表人 / 负责人（可选）" {...register(`${p}.legalRep`)} />
-            )}
-            <Input placeholder="联系电话（可选）" {...register(`${p}.phone`)} />
-            <Input
-              placeholder={partyType === "ORGANIZATION" ? "经办联系人（可选）" : "代理 / 协助联系人（可选）"}
-              {...register(`${p}.contactName`)}
-            />
-            <div className="sm:col-span-2">
+          ) : (
+            <>
               <Input
-                placeholder={partyType === "ORGANIZATION" ? "注册地址（可选）" : "住址（可选）"}
-                {...register(`${p}.address`)}
+                placeholder="统一社会信用代码（必填）"
+                className={cn("h-8 flex-1 font-mono text-xs", idErr && "border-destructive")}
+                {...register(`${p}.enterpriseSocialCode`)}
               />
-            </div>
-            <div className="sm:col-span-2">
-              <Input placeholder="备注（可选）" {...register(`${p}.notes`)} />
-            </div>
-          </>
-        )}
+              <Popover
+                open={!!candidates && candidates.length > 0}
+                onOpenChange={(o) => {
+                  if (!o) setCandidates(null);
+                }}
+              >
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAILookup}
+                    disabled={searching || filling}
+                    className="h-8 w-8 shrink-0 p-0 text-primary"
+                    title="按公司名称在元典搜索 → 自动回填信用代码 + 法代 + 地址"
+                  >
+                    {searching ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-72 p-1.5">
+                  <div className="mb-1 flex items-center gap-1 px-1 text-[10px] text-muted-foreground">
+                    <Search className="h-3 w-3" />共 {candidates?.length ?? 0} 条候选，点击回填
+                  </div>
+                  <ul className="max-h-64 space-y-1 overflow-y-auto">
+                    {candidates?.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          onClick={() => handlePickCandidate(c)}
+                          disabled={filling}
+                          className="w-full rounded border border-border bg-background px-2 py-1.5 text-left text-xs hover:border-primary disabled:opacity-50"
+                        >
+                          <div className="font-medium">{c.name}</div>
+                          <div className="font-mono text-[10px] text-muted-foreground">{c.creditCode}</div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </PopoverContent>
+              </Popover>
+            </>
+          )}
+        </div>
+
+        {/* 操作：更多 + 删除 */}
+        <div className="flex items-center justify-end gap-0.5">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            title={expanded ? "收起" : "更多（电话 / 地址 / 联系人 / 备注）"}
+            className={cn(
+              "flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+              !expanded && secondaryFilled > 0 && "text-primary"
+            )}
+          >
+            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", expanded && "rotate-180")} />
+          </button>
+          {removable && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onRemove}
+              className="h-6 w-6 shrink-0 p-0 text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* 展开/收起 */}
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ChevronDown className={cn("h-3 w-3 transition-transform", expanded && "rotate-180")} />
-        {expanded
-          ? "收起"
-          : `更多${!expanded && secondaryFilled > 0 ? `（已填 ${secondaryFilled} 项）` : "（电话 / 地址 / 联系人 / 备注）"}`}
-      </button>
+      {/* 必填项错误（折叠态也要可见） */}
+      {idErr && (
+        <p className="px-2 pb-1.5 text-[10px] text-destructive">{idErr.message as string}</p>
+      )}
+
+      {/* 次要字段（展开） */}
+      {expanded && (
+        <div className="grid grid-cols-1 gap-2 border-t border-border px-2 py-2 sm:grid-cols-2">
+          {partyType === "ORGANIZATION" && (
+            <Input
+              className="h-8 text-sm"
+              placeholder="法定代表人 / 负责人（可选）"
+              {...register(`${p}.legalRep`)}
+            />
+          )}
+          <Input className="h-8 text-sm" placeholder="联系电话（可选）" {...register(`${p}.phone`)} />
+          <Input
+            className="h-8 text-sm"
+            placeholder={partyType === "ORGANIZATION" ? "经办联系人（可选）" : "代理 / 协助联系人（可选）"}
+            {...register(`${p}.contactName`)}
+          />
+          <div className="sm:col-span-2">
+            <Input
+              className="h-8 text-sm"
+              placeholder={partyType === "ORGANIZATION" ? "注册地址（可选）" : "住址（可选）"}
+              {...register(`${p}.address`)}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <Input className="h-8 text-sm" placeholder="备注（可选）" {...register(`${p}.notes`)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
