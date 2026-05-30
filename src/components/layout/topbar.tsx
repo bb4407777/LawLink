@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { NotificationPopover } from "@/components/layout/notification-popover";
 import { SearchDialog } from "@/components/layout/search-dialog";
+import { ToolsDialog } from "@/components/layout/tools-dialog";
 import { cn } from "@/lib/utils";
 
 const roleLabels: Record<string, string> = {
@@ -43,21 +44,23 @@ const roleLabels: Record<string, string> = {
   FINANCE: "财务"
 };
 
-// 应用菜单聚合入口（替代原侧边的 快递/工具/服务中心）
+// 应用菜单聚合入口（v0.38：各分类拆回独立页；实务工具=全局弹窗；法律导航=外链）
+// kind: "tools" 触发工具箱弹窗（不跳转）；"external" 新标签外链；其余 Link 跳独立页
 const APP_ITEMS = [
-  { label: "实务工具", href: "/service-center?tab=tools", icon: Calculator },
-  { label: "快递跟踪", href: "/service-center?tab=express", icon: Package },
-  { label: "律所文书", href: "/service-center?tab=firm-files", icon: FolderArchive },
-  { label: "法律导航", href: "https://yesen.cn", icon: Compass, external: true },
-  { label: "公告指引", href: "/service-center?tab=announcements", icon: Megaphone },
-  { label: "制度规范", href: "/service-center?tab=policy", icon: BookText },
-  { label: "通讯录", href: "/service-center?tab=contacts", icon: Contact }
+  { label: "实务工具", icon: Calculator, kind: "tools" },
+  { label: "快递跟踪", href: "/express", icon: Package, kind: "link" },
+  { label: "律所文书", href: "/firm-resources", icon: FolderArchive, kind: "link" },
+  { label: "法律导航", href: "https://yesen.cn", icon: Compass, kind: "external" },
+  { label: "公告指引", href: "/announcements", icon: Megaphone, kind: "link" },
+  { label: "制度规范", href: "/policy", icon: BookText, kind: "link" },
+  { label: "通讯录", href: "/contacts", icon: Contact, kind: "link" }
 ] as const;
 
 export function Topbar({ onMobileMenuToggle }: { onMobileMenuToggle?: () => void }) {
   const { data: session } = useSession();
   const router = useRouter();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const user = session?.user;
   const displayName = user?.name ?? "";
   const roleLabel = user?.role ? (roleLabels[user.role] ?? user.role) : "";
@@ -111,26 +114,39 @@ export function Topbar({ onMobileMenuToggle }: { onMobileMenuToggle?: () => void
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            {APP_ITEMS.map((it) => (
-              <DropdownMenuItem key={it.label} asChild>
-                {"external" in it && it.external ? (
-                  <a
-                    href={it.href}
-                    target="_blank"
-                    rel="noreferrer"
+            {APP_ITEMS.map((it) => {
+              // 实务工具：打开全局工具箱弹窗，不跳转、不改路由
+              if (it.kind === "tools") {
+                return (
+                  <DropdownMenuItem
+                    key={it.label}
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setToolsOpen(true);
+                    }}
                     className="cursor-pointer"
                   >
                     <it.icon className="mr-2 h-4 w-4 text-muted-foreground" strokeWidth={1.8} />
                     {it.label}
-                  </a>
-                ) : (
-                  <Link href={it.href} className="cursor-pointer">
-                    <it.icon className="mr-2 h-4 w-4 text-muted-foreground" strokeWidth={1.8} />
-                    {it.label}
-                  </Link>
-                )}
-              </DropdownMenuItem>
-            ))}
+                  </DropdownMenuItem>
+                );
+              }
+              return (
+                <DropdownMenuItem key={it.label} asChild>
+                  {it.kind === "external" ? (
+                    <a href={it.href} target="_blank" rel="noreferrer" className="cursor-pointer">
+                      <it.icon className="mr-2 h-4 w-4 text-muted-foreground" strokeWidth={1.8} />
+                      {it.label}
+                    </a>
+                  ) : (
+                    <Link href={it.href} className="cursor-pointer">
+                      <it.icon className="mr-2 h-4 w-4 text-muted-foreground" strokeWidth={1.8} />
+                      {it.label}
+                    </Link>
+                  )}
+                </DropdownMenuItem>
+              );
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -198,6 +214,7 @@ export function Topbar({ onMobileMenuToggle }: { onMobileMenuToggle?: () => void
       </DropdownMenu>
 
       <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      <ToolsDialog open={toolsOpen} onOpenChange={setToolsOpen} />
     </header>
   );
 }

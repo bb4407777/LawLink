@@ -105,7 +105,7 @@ export async function createExternalContact(input: z.infer<typeof externalContac
     targetId: created.id,
     detail: { name: created.name, category: created.category }
   });
-  revalidatePath("/service-center");
+  revalidatePath("/contacts");
   return created;
 }
 
@@ -135,7 +135,7 @@ export async function updateExternalContact(input: z.infer<typeof externalContac
     targetId: data.id,
     detail: { name: updated.name }
   });
-  revalidatePath("/service-center");
+  revalidatePath("/contacts");
   return updated;
 }
 
@@ -152,5 +152,5 @@ export async function archiveExternalContact(id: string) {
     targetType: "ExternalContact",
     targetId: id
   });
-  revalidatePath("/service-center");
+  revalidatePath("/contacts");
 }

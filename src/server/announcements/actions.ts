@@ -83,7 +83,7 @@ export async function createAnnouncement(input: z.infer<typeof announcementCreat
     detail: { title: created.title, pinned: created.pinned }
   });
 
-  revalidatePath("/service-center");
+  revalidatePath("/announcements");
   revalidatePath("/", "layout"); // banner 在全站布局
   return created;
 }
@@ -111,7 +111,7 @@ export async function updateAnnouncement(input: z.infer<typeof announcementUpdat
     detail: { title: updated.title, pinned: updated.pinned }
   });
 
-  revalidatePath("/service-center");
+  revalidatePath("/announcements");
   revalidatePath("/", "layout");
   return updated;
 }
@@ -132,6 +132,6 @@ export async function archiveAnnouncement(id: string) {
     targetId: id
   });
 
-  revalidatePath("/service-center");
+  revalidatePath("/announcements");
   revalidatePath("/", "layout");
 }

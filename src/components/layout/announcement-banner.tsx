@@ -33,7 +33,7 @@ export function AnnouncementBanner({ banners }: { banners: Banner[] }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
             <Link
-              href="/service-center?tab=announcements"
+              href="/announcements"
               className="truncate text-sm font-medium hover:underline"
             >
               {current.title}

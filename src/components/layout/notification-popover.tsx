@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Bell } from "lucide-react";
 import {
   Popover,
@@ -56,14 +56,61 @@ export function NotificationPopover() {
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const router = useRouter();
 
-  const fetchUnread = useCallback(async () => {
-    try {
-      const count = await getUnreadCount();
-      setUnread(count);
-    } catch {}
-  }, []);
+  // 已弹过桌面通知的 id（含挂载时已存在的，避免刷新页面就刷屏）
+  const seenIds = useRef<Set<string>>(new Set());
+  const seededRef = useRef(false);
 
-  useEffect(() => { fetchUnread(); }, [fetchUnread]);
+  // 轮询：刷新未读数 + 对新到的未读通知弹浏览器桌面通知
+  const poll = useCallback(async () => {
+    try {
+      const [count, list] = await Promise.all([
+        getUnreadCount(),
+        getNotifications({ limit: 20 })
+      ]);
+      setUnread(count);
+      setNotifications(list);
+
+      const unreadList = list.filter((n) => !n.read);
+      if (!seededRef.current) {
+        // 首次轮询：只记录现有 id，不弹（否则每次进站都炸一堆系统通知）
+        unreadList.forEach((n) => seenIds.current.add(n.id));
+        seededRef.current = true;
+        return;
+      }
+      const canNotify =
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted";
+      for (const n of unreadList) {
+        if (seenIds.current.has(n.id)) continue;
+        seenIds.current.add(n.id);
+        if (canNotify) {
+          const notif = new Notification(n.title, {
+            body: n.content ?? undefined,
+            tag: n.id,
+            icon: "/favicon.ico"
+          });
+          if (n.href) {
+            notif.onclick = () => {
+              window.focus();
+              router.push(n.href as string);
+              notif.close();
+            };
+          }
+        }
+      }
+    } catch {}
+  }, [router]);
+
+  useEffect(() => {
+    // 请求桌面通知授权（用户可拒绝；拒绝后仅站内铃铛生效）
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+    poll();
+    const timer = setInterval(poll, 60_000);
+    return () => clearInterval(timer);
+  }, [poll]);
 
   const handleOpen = async (isOpen: boolean) => {
     setOpen(isOpen);

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Settings, Users, Layers, ScrollText, KeyRound, Sparkles, Package, ListChecks } from "lucide-react";
+import { Settings, Users, Layers, ScrollText, KeyRound, Sparkles, Package, ListChecks, BellRing } from "lucide-react";
 import { getSession } from "@/lib/auth/session";
 
 export default async function SettingsLayout({
@@ -9,6 +9,7 @@ export default async function SettingsLayout({
 }) {
   const session = await getSession();
   const isAdmin = session?.user.role === "ADMIN";
+  const isManager = isAdmin || session?.user.role === "PRINCIPAL_LAWYER";
 
   return (
     <div className="space-y-5">
@@ -28,6 +29,14 @@ export default async function SettingsLayout({
             >
               个人 / 改密码
             </SettingsNavLink>
+            {isManager && (
+              <SettingsNavLink
+                href="/settings/reminders"
+                icon={<BellRing className="h-3.5 w-3.5" />}
+              >
+                提醒维护
+              </SettingsNavLink>
+            )}
             {isAdmin && (
               <>
                 <SettingsNavLink
