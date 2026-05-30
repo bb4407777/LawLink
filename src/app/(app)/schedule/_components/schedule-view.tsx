@@ -351,14 +351,11 @@ function CalendarView({
           ))}
           {cells.map((cell, idx) => {
             if (!cell.date || !cell.key) {
-              return <div key={idx} className="h-20 rounded-md border border-transparent" />;
+              return <div key={idx} className="h-24 rounded-md border border-transparent" />;
             }
             const dayItems = itemsByKey.get(cell.key) ?? [];
             const isToday = cell.key === todayKey;
             const isSelected = cell.key === selectedDay;
-            const hasHearing = dayItems.some((it) => it.type === "hearing");
-            const hasDeadline = dayItems.some((it) => it.type === "deadline");
-            const hasTask = dayItems.some((it) => it.type === "task");
 
             return (
               <button
@@ -366,7 +363,7 @@ function CalendarView({
                 type="button"
                 onClick={() => onSelectDay(cell.key)}
                 className={cn(
-                  "group flex h-20 flex-col rounded-md border p-1.5 text-left transition-colors",
+                  "group flex h-24 flex-col rounded-md border p-1.5 text-left transition-colors",
                   isSelected
                     ? "border-primary bg-primary/15"
                     : "border-border bg-background hover:border-input",
@@ -381,28 +378,27 @@ function CalendarView({
                 >
                   {cell.date.getDate()}
                 </div>
-                <div className="mt-auto flex items-center gap-1">
-                  {hasHearing && (
-                    <span
-                      className="h-1.5 w-1.5 rounded-full"
-                      style={{ backgroundColor: "#5B8DEF" }}
-                    />
-                  )}
-                  {hasDeadline && (
-                    <span
-                      className="h-1.5 w-1.5 rounded-full"
-                      style={{ backgroundColor: "#FBBF24" }}
-                    />
-                  )}
-                  {hasTask && (
-                    <span
-                      className="h-1.5 w-1.5 rounded-full"
-                      style={{ backgroundColor: "#4FD1C5" }}
-                    />
-                  )}
-                  {dayItems.length > 0 && (
-                    <span className="ml-auto font-mono text-[10px] tabular text-muted-foreground">
-                      {dayItems.length}
+                {/* 事件直接以彩色条目显示在格子里（开庭/期限/任务）*/}
+                <div className="mt-0.5 flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
+                  {dayItems.slice(0, 3).map((it) => {
+                    const color = typeMeta[it.type].color;
+                    return (
+                      <span
+                        key={it.id}
+                        title={`${typeMeta[it.type].label}：${it.title}`}
+                        className={cn(
+                          "truncate rounded-sm px-1 text-[10px] leading-[14px]",
+                          it.completed && "line-through opacity-50"
+                        )}
+                        style={{ backgroundColor: `${color}22`, color }}
+                      >
+                        {it.title}
+                      </span>
+                    );
+                  })}
+                  {dayItems.length > 3 && (
+                    <span className="px-1 text-[9px] text-muted-foreground">
+                      +{dayItems.length - 3}
                     </span>
                   )}
                 </div>

@@ -6,14 +6,11 @@ import {
   Wallet,
   Calendar,
   Shield,
-  Package,
   ClipboardCheck,
-  Calculator,
   Archive,
   Settings,
   BarChart3,
-  ShieldCheck,
-  FolderArchive
+  ShieldCheck
 } from "lucide-react";
 
 export type NavItem = {
@@ -27,6 +24,7 @@ export type NavItem = {
 // v0.8.1: 用章统一收口到"审批"（未来可扩文书内审等其他审批类型）
 // v0.9.3: 加"快递"
 // v0.11: 隐藏"收件箱"（短信解析使用率低，代码与路由保留以便恢复）
+// v0.37: 快递/工具/服务中心 移入顶栏「应用」菜单，不再占侧边
 export const primaryNav: NavItem[] = [
   { label: "仪表盘", href: "/", icon: LayoutDashboard },
   { label: "案件", href: "/matters", icon: FolderOpen },
@@ -34,14 +32,10 @@ export const primaryNav: NavItem[] = [
   { label: "财务", href: "/finance", icon: Wallet },
   { label: "日程", href: "/schedule", icon: Calendar },
   { label: "保全", href: "/preservation", icon: Shield },
-  { label: "快递", href: "/express", icon: Package },
   { label: "审批", href: "/approvals/seals", icon: ClipboardCheck }
 ];
 
-// 注：sidebar"工具"项的 href 是 sentinel — Sidebar 拦截 onClick 改为弹窗，不真跳转
 export const secondaryNav: NavItem[] = [
-  { label: "工具", href: "#tools", icon: Calculator },
-  { label: "服务中心", href: "/service-center", icon: FolderArchive },
   { label: "归档", href: "/archive", icon: Archive },
   { label: "报表", href: "/reports", icon: BarChart3 },
   { label: "审计", href: "/audit", icon: ShieldCheck },

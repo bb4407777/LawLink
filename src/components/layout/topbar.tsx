@@ -9,8 +9,15 @@ import {
   LogOut,
   User,
   Settings as SettingsIcon,
-  ShieldCheck,
-  Menu
+  Menu,
+  LayoutGrid,
+  Calculator,
+  Package,
+  FolderArchive,
+  Contact,
+  Compass,
+  Megaphone,
+  BookText
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -24,7 +31,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { ConflictDialog } from "@/components/conflict-dialog";
 import { NotificationPopover } from "@/components/layout/notification-popover";
 import { SearchDialog } from "@/components/layout/search-dialog";
 import { cn } from "@/lib/utils";
@@ -37,10 +43,20 @@ const roleLabels: Record<string, string> = {
   FINANCE: "财务"
 };
 
+// 应用菜单聚合入口（替代原侧边的 快递/工具/服务中心）
+const APP_ITEMS = [
+  { label: "实务工具", href: "/tools/calc", icon: Calculator },
+  { label: "快递跟踪", href: "/express", icon: Package },
+  { label: "律所文书", href: "/service-center?tab=firm-files", icon: FolderArchive },
+  { label: "法律导航", href: "https://yesen.cn", icon: Compass, external: true },
+  { label: "公告指引", href: "/service-center?tab=announcements", icon: Megaphone },
+  { label: "制度规范", href: "/service-center?tab=firm-files&cat=POLICY", icon: BookText },
+  { label: "通讯录", href: "/service-center?tab=contacts", icon: Contact }
+] as const;
+
 export function Topbar({ onMobileMenuToggle }: { onMobileMenuToggle?: () => void }) {
   const { data: session } = useSession();
   const router = useRouter();
-  const [conflictOpen, setConflictOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const user = session?.user;
   const displayName = user?.name ?? "";
@@ -79,18 +95,44 @@ export function Topbar({ onMobileMenuToggle }: { onMobileMenuToggle?: () => void
 
       {/* 工具按钮组 */}
       <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => setConflictOpen(true)}
-          className={cn(
-            "inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-[13px]",
-            "text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          )}
-          title="利益冲突检索"
-        >
-          <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary" strokeWidth={1.8} />
-          <span className="hidden sm:inline">利益冲突</span>
-        </button>
+        {/* 应用菜单（案件云式聚合入口）*/}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                "inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-[13px]",
+                "text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              )}
+              title="应用"
+            >
+              <LayoutGrid className="h-3.5 w-3.5 shrink-0 text-primary" strokeWidth={1.8} />
+              <span className="hidden sm:inline">应用</span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            {APP_ITEMS.map((it) => (
+              <DropdownMenuItem key={it.label} asChild>
+                {"external" in it && it.external ? (
+                  <a
+                    href={it.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="cursor-pointer"
+                  >
+                    <it.icon className="mr-2 h-4 w-4 text-muted-foreground" strokeWidth={1.8} />
+                    {it.label}
+                  </a>
+                ) : (
+                  <Link href={it.href} className="cursor-pointer">
+                    <it.icon className="mr-2 h-4 w-4 text-muted-foreground" strokeWidth={1.8} />
+                    {it.label}
+                  </Link>
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <Button
           size="sm"
@@ -155,7 +197,6 @@ export function Topbar({ onMobileMenuToggle }: { onMobileMenuToggle?: () => void
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <ConflictDialog open={conflictOpen} onOpenChange={setConflictOpen} />
       <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
     </header>
   );

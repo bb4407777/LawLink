@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Scale } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { primaryNav, secondaryNav, type NavItem } from "./nav-config";
-import { ToolsDialog } from "./tools-dialog";
 
 /** 桌面侧边栏（md 以上显示） */
 export function Sidebar() {
@@ -20,7 +18,6 @@ export function Sidebar() {
 /** 导航内容 — 桌面侧边栏和移动 Sheet 共用 */
 export function NavContent() {
   const pathname = usePathname();
-  const [toolsOpen, setToolsOpen] = useState(false);
 
   return (
     <>
@@ -52,24 +49,11 @@ export function NavContent() {
 
       <div className="px-3 py-3">
         <div className="space-y-0.5">
-          {secondaryNav.map((item) =>
-            item.href === "#tools" ? (
-              <NavLink
-                key={item.href}
-                item={item}
-                active={false}
-                onClick={(e) => {
-                  e.preventDefault();
-                  setToolsOpen(true);
-                }}
-              />
-            ) : (
-              <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} />
-            )
-          )}
+          {secondaryNav.map((item) => (
+            <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} />
+          ))}
         </div>
       </div>
-      <ToolsDialog open={toolsOpen} onOpenChange={setToolsOpen} />
     </>
   );
 }
