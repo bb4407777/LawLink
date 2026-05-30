@@ -556,6 +556,123 @@ export function IntakeSheet({
     }
   }
 
+  // 主办 / 协办 / 律协备案 / 反诉 字段（多处复用）
+  function leadField() {
+    return (
+      <Field label="主办律师" required>
+        <Select
+          value={ownerUserId ?? ""}
+          onValueChange={(v) => setValue("ownerUserId", v, { shouldDirty: true })}
+        >
+          <SelectTrigger className="h-10 bg-background">
+            <SelectValue placeholder="选择主办律师" />
+          </SelectTrigger>
+          <SelectContent>
+            {colleagues.map((u) => (
+              <SelectItem key={u.id} value={u.id}>
+                {u.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+    );
+  }
+
+  function coLeadField() {
+    return (
+      <Field label="协办人员（可多选）">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 w-full justify-between rounded-sm bg-background font-normal"
+            >
+              <span className="truncate">
+                {coUserIds.length === 0 ? (
+                  <span className="text-muted-foreground">选择协办人员</span>
+                ) : (
+                  colleagues
+                    .filter((u) => coUserIds.includes(u.id))
+                    .map((u) => u.name)
+                    .join("、")
+                )}
+              </span>
+              <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-[--radix-popover-trigger-width] p-1.5">
+            <div className="max-h-56 space-y-0.5 overflow-y-auto">
+              {colleagues.filter((u) => u.id !== ownerUserId).length === 0 ? (
+                <p className="py-4 text-center text-xs text-muted-foreground">暂无可选协办</p>
+              ) : (
+                colleagues
+                  .filter((u) => u.id !== ownerUserId)
+                  .map((u) => (
+                    <label
+                      key={u.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
+                    >
+                      <Checkbox
+                        checked={coUserIds.includes(u.id)}
+                        onCheckedChange={() => toggleCo(u.id)}
+                      />
+                      <span>{u.name}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {userRoleLabel[u.role]}
+                      </span>
+                    </label>
+                  ))
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </Field>
+    );
+  }
+
+  function barFilingField() {
+    return (
+      <Field label="是否需向律协备案">
+        <Select
+          value={watch("barFiling") ?? ""}
+          onValueChange={(v) => setValue("barFiling", v as BarFilingType, { shouldDirty: true })}
+        >
+          <SelectTrigger className="h-10 bg-background">
+            <SelectValue placeholder="选择" />
+          </SelectTrigger>
+          <SelectContent>
+            {BAR_FILING_OPTIONS.map((b) => (
+              <SelectItem key={b} value={b}>
+                {barFilingLabel[b]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+    );
+  }
+
+  function counterclaimField() {
+    return (
+      <Field label="是否反诉">
+        <Select
+          value={watch("counterclaim") ? "yes" : "no"}
+          onValueChange={(v) => setValue("counterclaim", v === "yes", { shouldDirty: true })}
+        >
+          <SelectTrigger className="h-10 bg-background">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="no">否</SelectItem>
+            <SelectItem value="yes">是</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
+    );
+  }
+
   // 当事人/相关方录入表格（按类别复用，诉讼/仲裁含诉讼地位列）
   function renderParties(mode: CategoryKind) {
     const showStanding = mode === "litigation";
@@ -760,8 +877,8 @@ export function IntakeSheet({
           <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
             {/* ① 基本信息（共用：类别 / 名称 / 收案 / 经办）*/}
             <Section title="① 基本信息" required>
-              {/* 案件类别 | 名称 | 收案时间 */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[6fr_18fr_8fr]">
+              {/* 案件类别 | 收案时间（与类别等宽）| 案件名称（剩余）*/}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[6fr_6fr_24fr]">
                 <Field label="案件类别" required>
                   <Select
                     value={category}
@@ -779,6 +896,20 @@ export function IntakeSheet({
                     </SelectContent>
                   </Select>
                 </Field>
+                <Field label="收案时间">
+                  <div className="relative">
+                    <Input
+                      type="date"
+                      value={
+                        receivedAt ? new Date(receivedAt).toISOString().split("T")[0] : ""
+                      }
+                      onChange={(e) =>
+                        setValue("receivedAt", new Date(e.target.value), { shouldDirty: true })
+                      }
+                    />
+                    <CalendarDays className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  </div>
+                </Field>
                 <Field label={nameLabel} error={errors.title?.message}>
                   {(() => {
                     const titleReg = register("title");
@@ -794,98 +925,11 @@ export function IntakeSheet({
                     );
                   })()}
                 </Field>
-                <Field label="收案时间">
-                  <div className="relative">
-                    <Input
-                      type="date"
-                      value={
-                        receivedAt ? new Date(receivedAt).toISOString().split("T")[0] : ""
-                      }
-                      onChange={(e) =>
-                        setValue("receivedAt", new Date(e.target.value), { shouldDirty: true })
-                      }
-                    />
-                    <CalendarDays className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  </div>
-                </Field>
               </div>
 
-              {/* 主办律师 | 协办律师/助理 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="主办律师" required>
-                  <Select
-                    value={ownerUserId ?? ""}
-                    onValueChange={(v) => setValue("ownerUserId", v, { shouldDirty: true })}
-                  >
-                    <SelectTrigger className="h-10 bg-background">
-                      <SelectValue placeholder="选择主办律师" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {colleagues.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.name} · {userRoleLabel[u.role]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-
-                <Field label="协办律师 / 助理（可多选，事后可改）">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-10 w-full justify-between rounded-sm bg-background font-normal"
-                      >
-                        <span className="truncate">
-                          {coUserIds.length === 0 ? (
-                            <span className="text-muted-foreground">选择协办律师 / 助理</span>
-                          ) : (
-                            colleagues
-                              .filter((u) => coUserIds.includes(u.id))
-                              .map((u) => u.name)
-                              .join("、")
-                          )}
-                        </span>
-                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent align="start" className="w-[--radix-popover-trigger-width] p-1.5">
-                      <div className="max-h-56 space-y-0.5 overflow-y-auto">
-                        {colleagues.filter((u) => u.id !== ownerUserId).length === 0 ? (
-                          <p className="py-4 text-center text-xs text-muted-foreground">
-                            暂无可选协办
-                          </p>
-                        ) : (
-                          colleagues
-                            .filter((u) => u.id !== ownerUserId)
-                            .map((u) => (
-                              <label
-                                key={u.id}
-                                className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
-                              >
-                                <Checkbox
-                                  checked={coUserIds.includes(u.id)}
-                                  onCheckedChange={() => toggleCo(u.id)}
-                                />
-                                <span>{u.name}</span>
-                                <span className="text-[10px] text-muted-foreground">
-                                  {userRoleLabel[u.role]}
-                                </span>
-                              </label>
-                            ))
-                        )}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </Field>
-              </div>
-            </Section>
-
-            {/* ② 诉讼/仲裁类：案情信息 */}
-            {kind === "litigation" && (
-              <Section title="② 案情信息" required>
+              {/* 诉讼/仲裁：案情信息（并入基本信息）*/}
+              {kind === "litigation" && (
+                <>
                 {/* 案由 | 当前程序 | 管辖地 | 争议解决机构 */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <Field label="案由">
@@ -967,50 +1011,19 @@ export function IntakeSheet({
                   </Field>
                 </div>
 
-                {/* 需向律协备案与否 | 是否反诉 */}
+                {/* 主办 | 协办 | 是否需向律协备案 | 是否反诉（各 1/4）*/}
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                  <Field label="需向律协备案与否">
-                    <Select
-                      value={watch("barFiling") ?? ""}
-                      onValueChange={(v) =>
-                        setValue("barFiling", v as BarFilingType, { shouldDirty: true })
-                      }
-                    >
-                      <SelectTrigger className="h-10 bg-background">
-                        <SelectValue placeholder="选择" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {BAR_FILING_OPTIONS.map((b) => (
-                          <SelectItem key={b} value={b}>
-                            {barFilingLabel[b]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field label="是否反诉">
-                    <Select
-                      value={watch("counterclaim") ? "yes" : "no"}
-                      onValueChange={(v) =>
-                        setValue("counterclaim", v === "yes", { shouldDirty: true })
-                      }
-                    >
-                      <SelectTrigger className="h-10 bg-background">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="no">否</SelectItem>
-                        <SelectItem value="yes">是</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
+                  {leadField()}
+                  {coLeadField()}
+                  {barFilingField()}
+                  {counterclaimField()}
                 </div>
-              </Section>
+              </>
             )}
 
-            {/* ② 非诉/专项：项目信息 */}
+            {/* 非诉/专项：项目信息（并入基本信息）*/}
             {kind === "project" && (
-              <Section title="② 项目信息" required>
+              <>
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <Field label="业务类型">
                     <Select
@@ -1085,12 +1098,17 @@ export function IntakeSheet({
                     <Input placeholder="如：法律意见书 / 尽调报告" {...register("deliverables")} />
                   </Field>
                 </div>
-              </Section>
+                {/* 主办 | 协办（各 1/2）*/}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {leadField()}
+                  {coLeadField()}
+                </div>
+              </>
             )}
 
-            {/* ② 顾问：顾问信息 */}
+            {/* 顾问：顾问信息（并入基本信息）*/}
             {kind === "counsel" && (
-              <Section title="② 顾问信息" required>
+              <>
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <Field label="顾问类型">
                     <Select
@@ -1153,13 +1171,19 @@ export function IntakeSheet({
                     {...register("serviceScope")}
                   />
                 </Field>
-              </Section>
+                {/* 主办 | 协办（各 1/2）*/}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {leadField()}
+                  {coLeadField()}
+                </div>
+              </>
             )}
+            </Section>
 
             {/* ③ 当事人 / 相关方（按类别）*/}
             {kind === "litigation" && (
             <Section
-              title="③ 案件当事人"
+              title="② 案件当事人"
               required
               headerAction={addPartyBtn("添加当事人")}
             >
@@ -1210,20 +1234,20 @@ export function IntakeSheet({
 
             {/* ③ 非诉/专项：委托方与相对方（无诉讼地位）*/}
             {kind === "project" && (
-              <Section title="③ 委托方与相对方" headerAction={addPartyBtn("添加相对方")}>
+              <Section title="② 委托方与相对方" headerAction={addPartyBtn("添加相对方")}>
                 {renderParties("project")}
               </Section>
             )}
 
             {/* ③ 顾问：顾问单位 */}
             {kind === "counsel" && (
-              <Section title="③ 顾问单位" required>
+              <Section title="② 顾问单位" required>
                 {renderParties("counsel")}
               </Section>
             )}
 
             {/* 3. 律师费 */}
-            <Section title={kind === "counsel" ? "④ 顾问费" : "④ 律师费"}>
+            <Section title={kind === "counsel" ? "③ 顾问费" : "③ 律师费"}>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {FEE_TYPES.map((t) => (
                   <button
@@ -1321,7 +1345,7 @@ export function IntakeSheet({
 
             {/* 4. 合同 */}
             <Section
-              title="⑤ 委托合同 / 相关附件"
+              title="④ 委托合同 / 相关附件"
               headerAction={
                 <>
                   <input

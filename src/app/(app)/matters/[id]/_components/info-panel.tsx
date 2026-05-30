@@ -134,13 +134,17 @@ export function InfoPanel({
           </Button>
         </header>
         <div className="overflow-hidden rounded-b-lg">
-          {/* 行1：系统编号 | 收案时间 | 案件类型 | 案件名称（更宽）*/}
+          {/* 行1：系统编号 | 收案时间 | 案件类型 | 案件名称（更宽，整行一行不换行）*/}
           <InfoRow>
-            <Pair label="系统编号">
+            <Pair label="系统编号" tight>
               <span className="font-mono tabular">{matter.internalCode}</span>
             </Pair>
-            <Pair label="收案时间">{matter.intakeDate ? formatDate(matter.intakeDate) : "—"}</Pair>
-            <Pair label="案件类型">{matterCategoryLabel[matter.category]}</Pair>
+            <Pair label="收案时间" tight>
+              {matter.intakeDate ? formatDate(matter.intakeDate) : "—"}
+            </Pair>
+            <Pair label="案件类型" tight>
+              {matterCategoryLabel[matter.category]}
+            </Pair>
             <Pair label="案件名称" grow>
               <span className="font-medium">{matter.title || "—"}</span>
             </Pair>
@@ -167,7 +171,7 @@ export function InfoPanel({
           {/* 行3：主办律师 | 协办律师/助理 | 开票金额 | 回款金额 */}
           <InfoRow>
             <Pair label="主办律师">{lead ? lead.user.name : "—"}</Pair>
-            <Pair label="协办 / 助理">{coLabel}</Pair>
+            <Pair label="协办人员">{coLabel}</Pair>
             <Pair label="开票金额">
               <span className="font-mono tabular">{fmtMoney(finance.stats.invoiced)}</span>
             </Pair>
@@ -318,7 +322,7 @@ export function InfoPanel({
 /* —— Sub-components —— */
 
 // 一行：移动端纵向堆叠（pair 间横线），md+ 横向排列（pair 间竖线）
-function InfoRow({ children }: { children: React.ReactNode }) {
+export function InfoRow({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col divide-y divide-border border-b border-border last:border-b-0 md:flex-row md:divide-x md:divide-y-0">
       {children}
@@ -327,21 +331,34 @@ function InfoRow({ children }: { children: React.ReactNode }) {
 }
 
 // 一个标签-取值对：标签灰底（暗），取值白底（亮）
-function Pair({
+export function Pair({
   label,
   grow,
+  tight,
   children
 }: {
   label: string;
   grow?: boolean;
+  /** 只占内容宽度（值不换行），用于系统编号/收案时间等短字段，避免撑成两行 */
+  tight?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn("flex min-w-0", grow ? "md:flex-[2.4]" : "md:flex-1")}>
-      <div className="w-[84px] shrink-0 border-r border-border bg-muted/50 px-3 py-2 text-[11.5px] leading-snug text-muted-foreground">
+    <div
+      className={cn(
+        "flex min-w-0",
+        tight ? "md:flex-none" : grow ? "md:flex-[2.4]" : "md:flex-1"
+      )}
+    >
+      <div className="w-[68px] shrink-0 border-r border-border bg-muted/50 px-2.5 py-2 text-[11.5px] leading-snug text-muted-foreground">
         {label}
       </div>
-      <div className="min-w-0 flex-1 break-words bg-card px-3 py-2 text-[12.5px] leading-snug text-foreground/95">
+      <div
+        className={cn(
+          "min-w-0 flex-1 bg-card px-2.5 py-2 text-[12.5px] leading-snug text-foreground/95",
+          tight ? "whitespace-nowrap" : "break-words"
+        )}
+      >
         {children}
       </div>
     </div>

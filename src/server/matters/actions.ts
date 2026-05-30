@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
+import { Prisma, type LitigationStanding } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
@@ -98,6 +98,54 @@ export async function listMatters(input: Partial<MatterListQuery> = {}) {
   ]);
 
   return { items, total, page: query.page, pageSize: query.pageSize };
+}
+
+// v0.32: 程序级基本信息编辑
+export async function updateProcedureInfo(input: {
+  procedureId: string;
+  jurisdiction?: string;
+  handlingAgency?: string;
+  caseNumber?: string;
+  presidingJudge?: string;
+  presidingJudgeContact?: string;
+  judgeAssistant?: string;
+  judgeAssistantContact?: string;
+  ourStanding?: string | null;
+  acceptedAt?: string | null;
+  concludedAt?: string | null;
+}) {
+  const session = await requireSession();
+  const proc = await prisma.matterProcedure.findUnique({
+    where: { id: input.procedureId },
+    select: { matterId: true }
+  });
+  if (!proc) throw new Error("程序不存在");
+  await assertCanAccessMatter(session.user.id, session.user.role, proc.matterId);
+  await assertMatterWritable(proc.matterId);
+
+  await prisma.matterProcedure.update({
+    where: { id: input.procedureId },
+    data: {
+      jurisdiction: input.jurisdiction?.trim() || null,
+      handlingAgency: input.handlingAgency?.trim() || null,
+      caseNumber: input.caseNumber?.trim() || null,
+      presidingJudge: input.presidingJudge?.trim() || null,
+      presidingJudgeContact: input.presidingJudgeContact?.trim() || null,
+      judgeAssistant: input.judgeAssistant?.trim() || null,
+      judgeAssistantContact: input.judgeAssistantContact?.trim() || null,
+      ourStanding: input.ourStanding ? (input.ourStanding as LitigationStanding) : null,
+      acceptedAt: input.acceptedAt ? new Date(input.acceptedAt) : null,
+      concludedAt: input.concludedAt ? new Date(input.concludedAt) : null
+    }
+  });
+  await audit({
+    userId: session.user.id,
+    action: "PROCEDURE_INFO_UPDATE",
+    targetType: "MatterProcedure",
+    targetId: input.procedureId,
+    detail: { matterId: proc.matterId }
+  });
+  revalidatePath(`/matters/${proc.matterId}`);
 }
 
 // v0.32: 关联案件 —— 搜索 / 关联 / 解除

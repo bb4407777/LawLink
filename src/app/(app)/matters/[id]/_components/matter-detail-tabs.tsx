@@ -21,6 +21,7 @@ import { DocumentsPanel, type DocumentPayload } from "./documents-panel";
 import { FinancePanel } from "./finance-panel";
 import { ProcedureContent } from "./procedure-content";
 import { ProcedureDocumentsSection } from "./procedure-documents-section";
+import { ProcedureInfoPanel } from "./procedure-info-panel";
 import { TimelinePanel } from "./timeline-panel";
 import { NotesPanel } from "./notes-panel";
 import { DocumentDraftDialog } from "./document-draft-dialog";
@@ -425,6 +426,7 @@ export function MatterDetailTabs({
               }));
             return (
               <div key={p.id} className="space-y-4">
+                <ProcedureInfoPanel procedure={p} />
                 <ProcedureContent procedure={p} />
                 {/* v0.27: 程序下"案件材料"区，替代原全局案卷材料 tab */}
                 <ProcedureDocumentsSection
