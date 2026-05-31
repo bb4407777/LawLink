@@ -384,7 +384,7 @@ export function Pair({
     <div
       className={cn(
         "flex min-w-0",
-        tight ? "md:flex-none" : grow ? "md:flex-[2.4]" : "md:flex-1"
+        tight ? "md:flex-none" : grow ? "md:flex-[2]" : "md:flex-1"
       )}
     >
       <div className="w-[68px] shrink-0 border-r border-border bg-muted/50 px-2.5 py-2 text-[11.5px] leading-snug text-muted-foreground">
@@ -401,4 +401,3 @@ export function Pair({
     </div>
   );
 }
-

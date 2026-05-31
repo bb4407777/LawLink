@@ -11,7 +11,6 @@ import {
   Plus,
   Scale,
   MessageSquare,
-  Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { matterStatusLabel, procedureTypeLabel } from "@/lib/enums";
@@ -24,7 +23,6 @@ import { ProcedureDocumentsSection } from "./procedure-documents-section";
 import { ProcedureInfoPanel } from "./procedure-info-panel";
 import { TimelinePanel } from "./timeline-panel";
 import { NotesPanel } from "./notes-panel";
-import { DocumentDraftDialog } from "./document-draft-dialog";
 import { CustomFieldsPanel } from "./custom-fields-panel";
 import { AddProcedureSheet } from "./procedure-forms";
 import { FoldersPanel } from "./folders-panel";
@@ -179,10 +177,6 @@ export function MatterDetailTabs({
   const [tab, setTab] = useState<TabKey>("info");
   const [addProcOpen, setAddProcOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
-  const [draftOpen, setDraftOpen] = useState(false);
-
-  const opposingName =
-    matter.parties.find((p) => p.role === "OPPOSING_PARTY")?.name ?? null;
 
   const engagedProcedures = matter.procedures
     .filter((p) => p.engagement === "ENGAGED")
@@ -203,14 +197,6 @@ export function MatterDetailTabs({
           {matter.title}
         </h1>
         <MatterStatusPill status={matter.status} />
-        <button
-          type="button"
-          onClick={() => setDraftOpen(true)}
-          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-border bg-card px-2.5 text-[12px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-        >
-          <Sparkles className="h-3.5 w-3.5" strokeWidth={1.8} />
-          AI 起草
-        </button>
         {currentUserRole && (
           <LifecycleActions
             matterId={matter.id}
@@ -451,12 +437,6 @@ export function MatterDetailTabs({
         matterId={matter.id}
         open={archiveOpen}
         onOpenChange={setArchiveOpen}
-      />
-      <DocumentDraftDialog
-        open={draftOpen}
-        onOpenChange={setDraftOpen}
-        defaultSelf={matter.primaryClient?.name ?? null}
-        defaultOpposing={opposingName}
       />
     </div>
   );
