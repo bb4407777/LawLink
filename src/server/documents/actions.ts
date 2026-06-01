@@ -160,6 +160,20 @@ export async function uploadDocument(formData: FormData) {
     detail: { matterId, intakeId, name, encrypted, size: file.size }
   });
 
+  // v0.43 项4：写入案件动态时间线（仅案件文档）
+  if (matterId) {
+    await prisma.timelineEvent.create({
+      data: {
+        matterId,
+        eventType: "DOCUMENT_UPLOADED",
+        title: `上传材料：${name.trim()}`,
+        occurredAt: new Date(),
+        refType: "Document",
+        refId: created.id
+      }
+    });
+  }
+
   if (matterId) revalidatePath(`/matters/${matterId}`);
   if (intakeId) revalidatePath(`/intakes/${intakeId}`);
   return { ok: true, id: created.id };

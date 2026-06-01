@@ -456,6 +456,18 @@ export async function updateMatterTeam(input: {
     detail: { ownerId: input.ownerId, coLeads: co.length, assistants: ass.length }
   });
 
+  // v0.43 项4：写入案件动态时间线
+  await prisma.timelineEvent.create({
+    data: {
+      matterId: input.matterId,
+      eventType: "TEAM_CHANGED",
+      title: "更新办案团队",
+      occurredAt: new Date(),
+      refType: "Matter",
+      refId: input.matterId
+    }
+  });
+
   revalidatePath(`/matters/${input.matterId}`);
   return { ok: true };
 }

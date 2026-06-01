@@ -50,6 +50,18 @@ export async function createTask(input: TaskCreateInput) {
     detail: { matterId: data.matterId, title: created.title }
   });
 
+  // v0.43 项4：写入案件动态时间线
+  await prisma.timelineEvent.create({
+    data: {
+      matterId: data.matterId,
+      eventType: "TASK_ADDED",
+      title: `新增任务：${created.title}`,
+      occurredAt: new Date(),
+      refType: "Task",
+      refId: created.id
+    }
+  });
+
   // 通知被指派人（非创建者本人时）
   if (data.assigneeId && data.assigneeId !== session.user.id) {
     await createNotification({

@@ -1,23 +1,36 @@
 "use client";
 
 import type { TimelineEvent } from "@prisma/client";
-import { Clock, FileText, Gavel, Coins } from "lucide-react";
+import { Clock, FileText, Gavel, Coins, CalendarClock, ListChecks, Upload, Users } from "lucide-react";
 
 const iconByType: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
   MATTER_CREATED: FileText,
   PROCEDURE_ADDED: FileText,
   HEARING_SCHEDULED: Gavel,
-  FEE_RECEIVED: Coins
+  FEE_RECEIVED: Coins,
+  // v0.43 项4：补齐案件动态
+  DEADLINE_ADDED: CalendarClock,
+  TASK_ADDED: ListChecks,
+  DOCUMENT_UPLOADED: Upload,
+  TEAM_CHANGED: Users
 };
 
 const colorByType: Record<string, string> = {
   MATTER_CREATED: "#5B8DEF",
   PROCEDURE_ADDED: "#4FD1C5",
   HEARING_SCHEDULED: "#FBBF24",
-  FEE_RECEIVED: "#4ADE80"
+  FEE_RECEIVED: "#4ADE80",
+  DEADLINE_ADDED: "#F59E0B",
+  TASK_ADDED: "#9B7BF7",
+  DOCUMENT_UPLOADED: "#5B8DEF",
+  TEAM_CHANGED: "#4FD1C5"
 };
 
 export function TimelinePanel({ events }: { events: TimelineEvent[] }) {
+  // v0.43：按发生时间倒序（最新动态在上）
+  const sorted = [...events].sort(
+    (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
+  );
   if (events.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-card py-16 text-center">
@@ -33,7 +46,7 @@ export function TimelinePanel({ events }: { events: TimelineEvent[] }) {
           aria-hidden
           className="absolute left-[15px] top-1 bottom-1 w-px bg-border"
         />
-        {events.map((e) => {
+        {sorted.map((e) => {
           const Icon = iconByType[e.eventType] ?? Clock;
           const color = colorByType[e.eventType] ?? "#5B8DEF";
           return (

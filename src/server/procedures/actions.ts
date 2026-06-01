@@ -164,6 +164,17 @@ export async function addDeadline(input: DeadlineCreateInput) {
       targetId: created.id,
       detail: { matterId: procedure.matterId, procedureId: data.procedureId }
     });
+    // v0.43 项4：写入案件动态时间线
+    await prisma.timelineEvent.create({
+      data: {
+        matterId: procedure.matterId,
+        eventType: "DEADLINE_ADDED",
+        title: `新增期限：${data.title}`,
+        occurredAt: new Date(),
+        refType: "Deadline",
+        refId: created.id
+      }
+    });
     revalidatePath(`/matters/${procedure.matterId}`);
   }
 
