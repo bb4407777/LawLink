@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useTransition } from "react";
-import { Check, ChevronsUpDown, Plus, Building2, Loader2 } from "lucide-react";
+import { Check, Plus, Building2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -123,20 +123,14 @@ export function ClientCombobox({
             !display && "text-muted-foreground"
           )}
         >
-          <span className="flex items-center gap-1.5 truncate">
+          <span className="flex items-center gap-1.5 truncate text-sm">
             {display || "搜索或直接输入名称"}
-            {clientId && (
-              <span className="ml-1 rounded-sm bg-primary/15 px-1 text-[10px] text-primary">
-                已建档
-              </span>
-            )}
             {!clientId && clientName && (
               <span className="ml-1 rounded-sm bg-primary/10 px-1 text-[10px] text-primary/80">
                 新客户
               </span>
             )}
           </span>
-          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent

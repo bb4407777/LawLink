@@ -684,7 +684,7 @@ export function IntakeSheet({
     const oppLabel = mode === "project" ? "交易相对方" : "相对方";
     return (
       <div className="overflow-x-auto rounded-lg border border-border bg-muted/25 p-2">
-        <div className={cn("space-y-2", showStanding ? "min-w-[1040px]" : "min-w-[900px]")}>
+        <div className={cn("space-y-2", showStanding ? "min-w-[980px]" : "min-w-[840px]")}>
           {/* 表头 */}
           <div
             className={cn(

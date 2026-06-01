@@ -36,12 +36,12 @@ import {
   type EnterpriseSearchItem
 } from "@/server/yuandian/enterprise";
 
-/** 表头与每一行共用，保证列对齐。诉讼/仲裁类含「诉讼地位」列（置于联系人前） */
+/** 表头与每一行共用，保证列对齐。诉讼/仲裁类含「诉讼地位」列（置于联系人前）。姓名/证件列较 v0 收窄约 15% */
 export const PARTY_GRID =
-  "grid grid-cols-[78px_104px_minmax(180px,1.25fr)_minmax(210px,1.35fr)_116px_104px_126px_40px] items-center gap-2";
+  "grid grid-cols-[78px_104px_minmax(150px,1.06fr)_minmax(178px,1.15fr)_116px_104px_126px_40px] items-center gap-2";
 /** 非诉/顾问/专项：无「诉讼地位」列 */
 export const PARTY_GRID_NO_STANDING =
-  "grid grid-cols-[78px_104px_minmax(180px,1.25fr)_minmax(210px,1.35fr)_104px_126px_40px] items-center gap-2";
+  "grid grid-cols-[78px_104px_minmax(150px,1.06fr)_minmax(178px,1.15fr)_104px_126px_40px] items-center gap-2";
 
 type Props = {
   index: number;
