@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Settings, Users, Layers, ScrollText, KeyRound, Sparkles, Package, ListChecks, BellRing, Building2 } from "lucide-react";
+import { Settings, Users, Layers, ScrollText, KeyRound, Sparkles, Package, ListChecks, BellRing, Building2, FileUp } from "lucide-react";
 import { getSession } from "@/lib/auth/session";
 
 export default async function SettingsLayout({
@@ -30,12 +30,20 @@ export default async function SettingsLayout({
               个人 / 改密码
             </SettingsNavLink>
             {isManager && (
-              <SettingsNavLink
-                href="/settings/reminders"
-                icon={<BellRing className="h-3.5 w-3.5" />}
-              >
-                提醒维护
-              </SettingsNavLink>
+              <>
+                <SettingsNavLink
+                  href="/settings/reminders"
+                  icon={<BellRing className="h-3.5 w-3.5" />}
+                >
+                  提醒维护
+                </SettingsNavLink>
+                <SettingsNavLink
+                  href="/settings/import"
+                  icon={<FileUp className="h-3.5 w-3.5" />}
+                >
+                  批量导入
+                </SettingsNavLink>
+              </>
             )}
             {isAdmin && (
               <>
