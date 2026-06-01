@@ -26,6 +26,8 @@ import { litigationStandingLabel, procedureToStandingOptions } from "@/lib/enums
 import { formatDate } from "@/lib/utils";
 import { updateProcedureInfo } from "@/server/matters/actions";
 import { InfoRow, Pair } from "./info-panel";
+import { JurisdictionSelect } from "@/app/(app)/intakes/_components/jurisdiction-select";
+import { agencyOptions } from "@/lib/china-regions";
 
 type Proc = {
   id: string;
@@ -188,10 +190,23 @@ function EditDialog({
         </DialogHeader>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FieldRow label="管辖地（省/市/区县）">
-            <Input value={form.jurisdiction} onChange={(e) => set("jurisdiction", e.target.value)} placeholder="如：广东省/广州市/天河区" />
+            <JurisdictionSelect
+              value={form.jurisdiction}
+              onChange={(v) => set("jurisdiction", v)}
+            />
           </FieldRow>
           <FieldRow label="管辖机构">
-            <Input value={form.handlingAgency} onChange={(e) => set("handlingAgency", e.target.value)} placeholder="如：广州市天河区人民法院" />
+            <Input
+              list={`proc-agency-${proc.id}`}
+              value={form.handlingAgency}
+              onChange={(e) => set("handlingAgency", e.target.value)}
+              placeholder="如：广州市天河区人民法院"
+            />
+            <datalist id={`proc-agency-${proc.id}`}>
+              {agencyOptions(form.jurisdiction).map((a) => (
+                <option key={a} value={a} />
+              ))}
+            </datalist>
           </FieldRow>
           <FieldRow label="案号">
             <Input value={form.caseNumber} onChange={(e) => set("caseNumber", e.target.value)} className="font-mono" />
