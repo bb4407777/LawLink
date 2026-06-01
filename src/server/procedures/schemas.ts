@@ -52,6 +52,7 @@ export const deadlineCategorySchema = z.enum([
   "RESPONSE",
   "ENFORCEMENT",
   "ARBITRATION_SET_ASIDE",
+  "PRESERVATION",
   "CUSTOM"
 ]);
 

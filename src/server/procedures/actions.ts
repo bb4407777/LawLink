@@ -293,3 +293,64 @@ export async function deleteHearing(id: string) {
   revalidatePath(`/matters/${current.procedure.matterId}`);
   return { ok: true };
 }
+
+// ============ ProcedureMemo（v0.42 备忘录）============
+
+export async function addProcedureMemo(input: {
+  procedureId: string;
+  content: string;
+}) {
+  const session = await requireSession();
+  const content = input.content.trim();
+  if (!content) throw new Error("备忘内容不能为空");
+  if (content.length > 1000) throw new Error("备忘内容过长（≤1000字）");
+
+  const proc = await prisma.matterProcedure.findUnique({
+    where: { id: input.procedureId },
+    select: { matterId: true }
+  });
+  if (!proc) throw new Error("程序不存在");
+  await assertMatterWritable(proc.matterId);
+
+  const created = await prisma.procedureMemo.create({
+    data: {
+      procedureId: input.procedureId,
+      content,
+      createdById: session.user.id
+    }
+  });
+  revalidatePath(`/matters/${proc.matterId}`);
+  return { ok: true, id: created.id };
+}
+
+export async function toggleProcedureMemo(id: string) {
+  const session = await requireSession();
+  const current = await prisma.procedureMemo.findUnique({
+    where: { id },
+    include: { procedure: { select: { matterId: true } } }
+  });
+  if (!current) return { ok: false };
+  await assertMatterWritable(current.procedure.matterId);
+
+  const next = !current.done;
+  await prisma.procedureMemo.update({
+    where: { id },
+    data: { done: next, doneAt: next ? new Date() : null }
+  });
+  revalidatePath(`/matters/${current.procedure.matterId}`);
+  return { ok: true };
+}
+
+export async function deleteProcedureMemo(id: string) {
+  const session = await requireSession();
+  const current = await prisma.procedureMemo.findUnique({
+    where: { id },
+    include: { procedure: { select: { matterId: true } } }
+  });
+  if (!current) return { ok: false };
+  await assertMatterWritable(current.procedure.matterId);
+
+  await prisma.procedureMemo.delete({ where: { id } });
+  revalidatePath(`/matters/${current.procedure.matterId}`);
+  return { ok: true };
+}

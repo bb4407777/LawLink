@@ -249,6 +249,8 @@ enum DeadlineCategory {
   RESPONSE
   ENFORCEMENT
   ARBITRATION_SET_ASIDE
+  // v0.42: 保全期限（含续期）
+  PRESERVATION
   CUSTOM
 }
 
@@ -701,6 +703,8 @@ model MatterProcedure {
   hearings  Hearing[]
   deadlines Deadline[]
   documents Document[]
+  // v0.42: 程序备忘录（待办/已办）
+  memos     ProcedureMemo[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -783,6 +787,21 @@ model Deadline {
 
   @@index([procedureId, dueAt, completed])
   @@index([dueAt, completed])
+}
+
+// v0.42: 程序备忘录（与重要时限并排，待办/已办状态）
+model ProcedureMemo {
+  id          String          @id @default(cuid())
+  procedureId String
+  procedure   MatterProcedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+  content     String
+  done        Boolean         @default(false)
+  doneAt      DateTime?
+  createdById String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([procedureId])
 }
 
 // ============================================================

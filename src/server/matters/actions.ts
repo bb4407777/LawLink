@@ -253,7 +253,8 @@ export async function getMatterById(id: string) {
         include: {
           deadlines: { orderBy: [{ completed: "asc" }, { dueAt: "asc" }] },
           hearings: { orderBy: { startsAt: "asc" } },
-          stages: { orderBy: { order: "asc" } }
+          stages: { orderBy: { order: "asc" } },
+          memos: { orderBy: [{ done: "asc" }, { createdAt: "desc" }] }
         }
       },
       tasks: {

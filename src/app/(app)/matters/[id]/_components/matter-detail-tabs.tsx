@@ -57,6 +57,7 @@ type MatterPayload = Prisma.MatterGetPayload<{
         deadlines: true;
         hearings: true;
         stages: true;
+        memos: true;
       };
     };
     tasks: true;

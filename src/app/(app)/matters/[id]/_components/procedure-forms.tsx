@@ -231,6 +231,7 @@ const deadlineCategoryLabel: Record<
   RESPONSE: "答辩期",
   ENFORCEMENT: "执行申请",
   ARBITRATION_SET_ASIDE: "撤销仲裁期",
+  PRESERVATION: "保全期限",
   CUSTOM: "其他"
 };
 
