@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
 import { assertMatterWritable } from "@/lib/archive/guard";
+import { assertCanAccessMatter } from "@/lib/permissions";
 import {
   procedureCreateSchema,
   procedureUpdateSchema,
@@ -29,6 +30,7 @@ function emptyToNull<T extends Record<string, unknown>>(obj: T): T {
 export async function addProcedure(input: ProcedureCreateInput) {
   const session = await requireSession();
   const data = procedureCreateSchema.parse(input);
+  await assertCanAccessMatter(session.user.id, session.user.role, data.matterId);
   await assertMatterWritable(data.matterId);
 
   const lastOrder = await prisma.matterProcedure.findFirst({
@@ -88,6 +90,7 @@ export async function updateProcedure(input: ProcedureUpdateInput) {
     select: { matterId: true }
   });
   if (!existing) throw new Error("程序不存在");
+  await assertCanAccessMatter(session.user.id, session.user.role, existing.matterId);
   await assertMatterWritable(existing.matterId);
 
   const updated = await prisma.matterProcedure.update({
@@ -114,6 +117,7 @@ export async function deleteProcedure(id: string) {
   if (session.user.role !== "ADMIN" && session.user.role !== "PRINCIPAL_LAWYER") {
     throw new Error("只有管理员或主办律师可以删除程序");
   }
+  await assertCanAccessMatter(session.user.id, session.user.role, procedure.matterId);
   await assertMatterWritable(procedure.matterId);
 
   await prisma.matterProcedure.delete({ where: { id } });
@@ -140,6 +144,7 @@ export async function addDeadline(input: DeadlineCreateInput) {
     select: { matterId: true }
   });
   if (!procedureForGuard) throw new Error("程序不存在");
+  await assertCanAccessMatter(session.user.id, session.user.role, procedureForGuard.matterId);
   await assertMatterWritable(procedureForGuard.matterId);
 
   const created = await prisma.deadline.create({
@@ -190,6 +195,7 @@ export async function toggleDeadlineCompleted(id: string) {
     include: { procedure: { select: { matterId: true } } }
   });
   if (!current) return { ok: false };
+  await assertCanAccessMatter(session.user.id, session.user.role, current.procedure.matterId);
   await assertMatterWritable(current.procedure.matterId);
 
   const next = !current.completed;
@@ -219,6 +225,7 @@ export async function deleteDeadline(id: string) {
     include: { procedure: { select: { matterId: true } } }
   });
   if (!current) return { ok: false };
+  await assertCanAccessMatter(session.user.id, session.user.role, current.procedure.matterId);
   await assertMatterWritable(current.procedure.matterId);
 
   await prisma.deadline.delete({ where: { id } });
@@ -243,6 +250,7 @@ export async function addHearing(input: HearingCreateInput) {
     select: { matterId: true }
   });
   if (!procedureForGuard) throw new Error("程序不存在");
+  await assertCanAccessMatter(session.user.id, session.user.role, procedureForGuard.matterId);
   await assertMatterWritable(procedureForGuard.matterId);
 
   const created = await prisma.hearing.create({
@@ -294,6 +302,7 @@ export async function deleteHearing(id: string) {
     include: { procedure: { select: { matterId: true } } }
   });
   if (!current) return { ok: false };
+  await assertCanAccessMatter(session.user.id, session.user.role, current.procedure.matterId);
   await assertMatterWritable(current.procedure.matterId);
 
   await prisma.hearing.delete({ where: { id } });
@@ -323,6 +332,7 @@ export async function addProcedureMemo(input: {
     select: { matterId: true }
   });
   if (!proc) throw new Error("程序不存在");
+  await assertCanAccessMatter(session.user.id, session.user.role, proc.matterId);
   await assertMatterWritable(proc.matterId);
 
   const created = await prisma.procedureMemo.create({
@@ -343,6 +353,7 @@ export async function toggleProcedureMemo(id: string) {
     include: { procedure: { select: { matterId: true } } }
   });
   if (!current) return { ok: false };
+  await assertCanAccessMatter(session.user.id, session.user.role, current.procedure.matterId);
   await assertMatterWritable(current.procedure.matterId);
 
   const next = !current.done;
@@ -361,6 +372,7 @@ export async function deleteProcedureMemo(id: string) {
     include: { procedure: { select: { matterId: true } } }
   });
   if (!current) return { ok: false };
+  await assertCanAccessMatter(session.user.id, session.user.role, current.procedure.matterId);
   await assertMatterWritable(current.procedure.matterId);
 
   await prisma.procedureMemo.delete({ where: { id } });

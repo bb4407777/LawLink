@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
 import { assertMatterWritable } from "@/lib/archive/guard";
+import { assertCanAccessMatter } from "@/lib/permissions";
 import { trackExpress, detectCompany } from "@/lib/express/track";
 import {
   saveExpressSettings as saveSettings,
@@ -80,6 +81,7 @@ export async function createExpress(input: z.infer<typeof expressCreateSchema>) 
       select: { id: true }
     });
     if (!m) throw new Error("关联案件不存在");
+    await assertCanAccessMatter(session.user.id, session.user.role, data.matterId);
     await assertMatterWritable(data.matterId);
   }
 

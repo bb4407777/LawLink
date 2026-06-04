@@ -19,17 +19,12 @@ export default async function MatterDetailPage({ params }: { params: { id: strin
   ]);
   if (!matter) notFound();
 
-  const [finance, userOptions, notes, documents, intakeContracts, folders, templates, preservations, allColleagues, sealContracts, expresses, latestArchive, customFieldDefs] = await Promise.all([
+  const [finance, userOptions, documents, intakeContracts, folders, templates, preservations, allColleagues, sealContracts, expresses, latestArchive, customFieldDefs] = await Promise.all([
     getMatterFinance(matter.id),
     prisma.user.findMany({
       where: { active: true },
       select: { id: true, name: true, role: true },
       orderBy: { name: "asc" }
-    }),
-    prisma.note.findMany({
-      where: { matterId: matter.id, deletedAt: null },
-      orderBy: { occurredAt: "desc" },
-      include: { author: { select: { id: true, name: true } } }
     }),
     prisma.document.findMany({
       where: { matterId: matter.id, deletedAt: null },
@@ -150,7 +145,6 @@ export default async function MatterDetailPage({ params }: { params: { id: strin
         matter={matter}
         finance={finance}
         userOptions={userOptions}
-        notes={notes}
         documents={documents}
         intakeContracts={intakeContracts}
         folders={folders}

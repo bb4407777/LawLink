@@ -8,6 +8,7 @@ import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
 import { createNotification } from "@/server/notifications/create";
 import { assertMatterWritable } from "@/lib/archive/guard";
+import { assertCanAccessMatter } from "@/lib/permissions";
 import { storage } from "@/lib/storage";
 import { validateUploadedFile } from "@/lib/storage/file-validator";
 import { decryptBuffer, encryptBuffer, sha256 } from "@/lib/storage/crypto";
@@ -210,6 +211,7 @@ export async function createSealRequest(formData: FormData) {
 
   // 若有 matterId 校验存在
   if (data.matterId) {
+    await assertCanAccessMatter(session.user.id, session.user.role, data.matterId);
     await assertMatterWritable(data.matterId);
     const m = await prisma.matter.findUnique({
       where: { id: data.matterId },

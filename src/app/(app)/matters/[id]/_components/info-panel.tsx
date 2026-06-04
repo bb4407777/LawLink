@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Plus, FileText } from "lucide-react";
+import { Pencil, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { matterCategoryLabel, matterCategoryKind } from "@/lib/enums";
 import { formatDate, cn } from "@/lib/utils";
 import type { MatterPayload, UserOption, FinancePayload } from "./matter-detail-tabs";
 import { TeamEditorDialog } from "./team-editor-dialog";
-import { AddReminderDialog } from "./add-reminder-dialog";
 import { RelatedMattersField } from "./related-matters-field";
 
 export function InfoPanel({
@@ -23,24 +22,6 @@ export function InfoPanel({
   contracts: { id: string; name: string }[];
 }) {
   const [teamEditorOpen, setTeamEditorOpen] = useState(false);
-  const [reminderOpen, setReminderOpen] = useState(false);
-
-  const upcomingDeadlines = matter.procedures
-    .flatMap((p) =>
-      p.deadlines
-        .filter((d) => !d.completed)
-        .map((d) => ({ ...d, procedureLabel: p.customLabel ?? p.type }))
-    )
-    .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
-    .slice(0, 5);
-
-  const upcomingHearings = matter.procedures
-    .flatMap((p) =>
-      p.hearings
-        .filter((h) => new Date(h.startsAt) >= new Date())
-        .map((h) => ({ ...h, procedureLabel: p.customLabel ?? p.type }))
-    )
-    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 
   const sortedMembers = matter.members.slice().sort((a, b) => {
     const order = { LEAD: 0, CO_LEAD: 1, ASSISTANT: 2 } as const;
@@ -53,35 +34,6 @@ export function InfoPanel({
     ?? matter.clientLinks.find((cl) => cl.isPrimary)?.client.name
     ?? matter.clientLinks[0]?.client.name
     ?? null;
-
-  // 重要时限及提醒：合并 期限 + 开庭 + 任务（未完成且有 dueAt）
-  const upcomingTasks = matter.tasks
-    .filter((t) => !t.completed && t.dueAt)
-    .map((t) => ({
-      kind: "task" as const,
-      id: t.id,
-      title: t.title,
-      date: new Date(t.dueAt!),
-      procedureLabel: "提醒"
-    }));
-
-  const allEvents = [
-    ...upcomingDeadlines.map((d) => ({
-      kind: "deadline" as const,
-      id: d.id,
-      title: d.title,
-      date: new Date(d.dueAt),
-      procedureLabel: d.procedureLabel
-    })),
-    ...upcomingHearings.map((h) => ({
-      kind: "hearing" as const,
-      id: h.id,
-      title: h.title,
-      date: new Date(h.startsAt),
-      procedureLabel: h.procedureLabel
-    })),
-    ...upcomingTasks
-  ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
   const coLabel =
     others.length === 0
@@ -221,7 +173,7 @@ export function InfoPanel({
             <Pair label="开票金额">
               <span className="font-mono tabular">{fmtMoney(finance.stats.invoiced)}</span>
             </Pair>
-            <Pair label="回款金额">
+            <Pair label="实收案款">
               <span className="font-mono tabular">{fmtMoney(finance.stats.received)}</span>
             </Pair>
           </InfoRow>
@@ -261,79 +213,6 @@ export function InfoPanel({
         </div>
       </section>
 
-      {/* —— 重要时限及提醒 —— */}
-      <div className="grid grid-cols-1 gap-4">
-        <section className="rounded-lg border border-border bg-card">
-          <header className="flex items-center justify-between border-b border-border px-4 py-2">
-            <span className="text-[13px] font-medium">
-              重要事项
-              {allEvents.length > 0 && (
-                <span className="ml-1 text-[11px] text-muted-foreground">({allEvents.length})</span>
-              )}
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setReminderOpen(true)}
-              className="h-6 gap-1 px-1.5 text-[11px] text-primary"
-              title="新建重要事项"
-            >
-              <Plus className="h-3 w-3" />
-              新建
-            </Button>
-          </header>
-          {allEvents.length === 0 ? (
-            <p className="py-6 text-center text-[11.5px] text-muted-foreground">
-              暂无开庭 / 期限 / 提醒
-            </p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {allEvents.slice(0, 6).map((e) => {
-                const days = Math.ceil(
-                  (e.date.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-                );
-                const isOverdue = days < 0;
-                const isWarn = !isOverdue && days <= 3;
-                return (
-                  <li key={`${e.kind}-${e.id}`} className="px-3 py-1.5 text-[12px]">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-sm px-1 py-0 text-[9.5px]",
-                          e.kind === "hearing"
-                            ? "bg-blue-500/10 text-blue-700"
-                            : e.kind === "task"
-                              ? "bg-primary/10 text-primary"
-                              : "bg-amber-500/10 text-amber-700"
-                        )}
-                      >
-                        {e.kind === "hearing" ? "庭" : e.kind === "task" ? "提" : "限"}
-                      </span>
-                      <span
-                        className={cn(
-                          "font-mono tabular text-[11px]",
-                          isOverdue
-                            ? "text-destructive"
-                            : isWarn
-                              ? "text-amber-500"
-                              : "text-muted-foreground"
-                        )}
-                      >
-                        {isOverdue ? `逾期 ${-days}d` : days === 0 ? "今天" : `${days}d`}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 truncate" title={e.title}>{e.title}</div>
-                    <div className="font-mono text-[10px] tabular text-muted-foreground">
-                      {e.date.toLocaleDateString("zh-CN")} · {e.procedureLabel}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-      </div>
-
       <TeamEditorDialog
         open={teamEditorOpen}
         onOpenChange={setTeamEditorOpen}
@@ -358,11 +237,6 @@ export function InfoPanel({
           name: m.user.name
         }))}
         userOptions={userOptions}
-      />
-      <AddReminderDialog
-        open={reminderOpen}
-        onOpenChange={setReminderOpen}
-        matterId={matter.id}
       />
     </div>
   );

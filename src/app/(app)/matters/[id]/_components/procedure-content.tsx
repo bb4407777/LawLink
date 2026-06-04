@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cn, daysUntil } from "@/lib/utils";
+import { procedureTypeLabel } from "@/lib/enums";
 import {
   toggleDeadlineCompleted,
   deleteDeadline,
@@ -30,7 +31,7 @@ import {
   addProcedureMemo,
   deleteProcedureMemo
 } from "@/server/procedures/actions";
-import { AddDeadlineSheet, AddHearingSheet } from "./procedure-forms";
+import { AddDeadlineDialog, AddHearingDialog } from "./procedure-forms";
 
 type ProcedureWithChildren = MatterProcedure & {
   deadlines: Deadline[];
@@ -39,54 +40,93 @@ type ProcedureWithChildren = MatterProcedure & {
   memos: ProcedureMemo[];
 };
 
-export function ProcedureContent({ procedure }: { procedure: ProcedureWithChildren }) {
-  const [deadlineSheetOpen, setDeadlineSheetOpen] = useState(false);
-  const [hearingSheetOpen, setHearingSheetOpen] = useState(false);
+// 聚合后带程序标签的行类型
+type HearingRowItem = Hearing & { procLabel: string };
+type DeadlineRowItem = Deadline & { procLabel: string };
+type MemoRowItem = ProcedureMemo & { procLabel: string };
 
-  const isInformational = procedure.engagement === "INFORMATIONAL";
+const procLabelOf = (p: MatterProcedure) =>
+  p.customLabel ?? procedureTypeLabel[p.type];
+
+/**
+ * v0.45：「提醒」与「备忘」改为全案聚合（跨所有在办程序）。
+ * 程序切换只影响上方的「程序基本信息 / 案件材料」；这两块展示本案所有程序的数据。
+ * 新增开庭 / 期限需在弹框内明确所处程序（默认当前选中程序）。
+ */
+export function ProcedureRemindersAndMemos({
+  procedures,
+  currentProcedureId
+}: {
+  /** 本案全部在办程序 */
+  procedures: ProcedureWithChildren[];
+  /** 当前选中的程序 id —— 作为新增开庭/期限/备忘的默认归属 */
+  currentProcedureId: string;
+}) {
+  const [deadlineOpen, setDeadlineOpen] = useState(false);
+  const [hearingOpen, setHearingOpen] = useState(false);
+
+  const multiProc = procedures.length > 1;
+  const procOptions = procedures.map((p) => ({ id: p.id, label: procLabelOf(p) }));
+
+  const hearings: HearingRowItem[] = procedures.flatMap((p) =>
+    p.hearings.map((h) => ({ ...h, procLabel: procLabelOf(p) }))
+  );
+  const deadlines: DeadlineRowItem[] = procedures.flatMap((p) =>
+    p.deadlines.map((d) => ({ ...d, procLabel: procLabelOf(p) }))
+  );
+  const memos: MemoRowItem[] = procedures
+    .flatMap((p) => p.memos.map((m) => ({ ...m, procLabel: procLabelOf(p) })))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   return (
-    <div className="space-y-4">
-      {/* INFORMATIONAL 程序不显示重要时限、备忘录（按设计） */}
-      {!isInformational && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {/* 左半：重要时限（合并开庭 + 各类期限） */}
-          <DeadlinesCard
-            deadlines={procedure.deadlines}
-            hearings={procedure.hearings}
-            onAddDeadline={() => setDeadlineSheetOpen(true)}
-            onAddHearing={() => setHearingSheetOpen(true)}
-          />
-
-          {/* 右半：备忘录 */}
-          <MemosCard procedureId={procedure.id} memos={procedure.memos} />
-        </div>
-      )}
-
-      <AddDeadlineSheet
-        open={deadlineSheetOpen}
-        onOpenChange={setDeadlineSheetOpen}
-        procedureId={procedure.id}
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {/* 左半：提醒（全案：开庭 + 各类期限） */}
+      <RemindersCard
+        deadlines={deadlines}
+        hearings={hearings}
+        multiProc={multiProc}
+        canAdd={procedures.length > 0}
+        onAddDeadline={() => setDeadlineOpen(true)}
+        onAddHearing={() => setHearingOpen(true)}
       />
-      <AddHearingSheet
-        open={hearingSheetOpen}
-        onOpenChange={setHearingSheetOpen}
-        procedureId={procedure.id}
+
+      {/* 右半：备忘（全案） */}
+      <MemosCard
+        memos={memos}
+        addProcedureId={currentProcedureId}
+        multiProc={multiProc}
+      />
+
+      <AddDeadlineDialog
+        open={deadlineOpen}
+        onOpenChange={setDeadlineOpen}
+        procedures={procOptions}
+        defaultProcedureId={currentProcedureId}
+      />
+      <AddHearingDialog
+        open={hearingOpen}
+        onOpenChange={setHearingOpen}
+        procedures={procOptions}
+        defaultProcedureId={currentProcedureId}
       />
     </div>
   );
 }
 
-// ============ 重要时限（开庭 + 期限分组）============
+// ============ 提醒（开庭 + 期限分组，全案聚合）============
 
-function DeadlinesCard({
+function RemindersCard({
   deadlines,
   hearings,
+  multiProc,
+  canAdd,
   onAddDeadline,
   onAddHearing
 }: {
-  deadlines: Deadline[];
-  hearings: Hearing[];
+  deadlines: DeadlineRowItem[];
+  hearings: HearingRowItem[];
+  multiProc: boolean;
+  canAdd: boolean;
   onAddDeadline: () => void;
   onAddHearing: () => void;
 }) {
@@ -140,13 +180,14 @@ function DeadlinesCard({
       <header className="mb-4 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <AlertTriangle className="h-4 w-4 text-[#FBBF24]" />
-          重要事项 <span className="text-muted-foreground">({total})</span>
+          提醒 <span className="text-muted-foreground">({total})</span>
         </h3>
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="sm"
             onClick={onAddHearing}
+            disabled={!canAdd}
             className="h-7 gap-1 text-primary"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -156,6 +197,7 @@ function DeadlinesCard({
             variant="ghost"
             size="sm"
             onClick={onAddDeadline}
+            disabled={!canAdd}
             className="h-7 gap-1 text-primary"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -174,7 +216,12 @@ function DeadlinesCard({
           {hearings.length > 0 && (
             <Group label="开庭" icon={<Gavel className="h-3 w-3" />}>
               {hearings.map((h) => (
-                <HearingRow key={h.id} h={h} onDelete={() => handleDeleteHearing(h.id)} />
+                <HearingRow
+                  key={h.id}
+                  h={h}
+                  multiProc={multiProc}
+                  onDelete={() => handleDeleteHearing(h.id)}
+                />
               ))}
             </Group>
           )}
@@ -185,6 +232,7 @@ function DeadlinesCard({
                 <DeadlineRow
                   key={d.id}
                   d={d}
+                  multiProc={multiProc}
                   onToggle={() => handleToggle(d.id)}
                   onDelete={() => handleDeleteDeadline(d.id)}
                   pending={isPending}
@@ -199,6 +247,7 @@ function DeadlinesCard({
                 <DeadlineRow
                   key={d.id}
                   d={d}
+                  multiProc={multiProc}
                   onToggle={() => handleToggle(d.id)}
                   onDelete={() => handleDeleteDeadline(d.id)}
                   pending={isPending}
@@ -213,6 +262,7 @@ function DeadlinesCard({
                 <DeadlineRow
                   key={d.id}
                   d={d}
+                  multiProc={multiProc}
                   onToggle={() => handleToggle(d.id)}
                   onDelete={() => handleDeleteDeadline(d.id)}
                   pending={isPending}
@@ -246,13 +296,27 @@ function Group({
   );
 }
 
+// 程序标签小徽章（仅多程序时显示，标明该条属于哪个程序）
+function ProcTag({ label }: { label: string }) {
+  return (
+    <Badge
+      variant="outline"
+      className="shrink-0 border-border bg-muted/40 px-1 text-[9px] font-normal text-muted-foreground"
+    >
+      {label}
+    </Badge>
+  );
+}
+
 function DeadlineRow({
   d,
+  multiProc,
   onToggle,
   onDelete,
   pending
 }: {
-  d: Deadline;
+  d: DeadlineRowItem;
+  multiProc: boolean;
   onToggle: () => void;
   onDelete: () => void;
   pending: boolean;
@@ -289,14 +353,17 @@ function DeadlineRow({
       </button>
 
       <div className="flex-1 overflow-hidden">
-        <span
-          className={cn(
-            "truncate text-sm font-medium",
-            d.completed && "line-through text-muted-foreground"
-          )}
-        >
-          {d.title}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span
+            className={cn(
+              "truncate text-sm font-medium",
+              d.completed && "line-through text-muted-foreground"
+            )}
+          >
+            {d.title}
+          </span>
+          {multiProc && <ProcTag label={d.procLabel} />}
+        </div>
         {d.basis && (
           <div className="mt-0.5 text-[11px] text-muted-foreground">{d.basis}</div>
         )}
@@ -333,7 +400,15 @@ function DeadlineRow({
   );
 }
 
-function HearingRow({ h, onDelete }: { h: Hearing; onDelete: () => void }) {
+function HearingRow({
+  h,
+  multiProc,
+  onDelete
+}: {
+  h: HearingRowItem;
+  multiProc: boolean;
+  onDelete: () => void;
+}) {
   const upcoming = new Date(h.startsAt) > new Date();
   return (
     <li className="group rounded-md border border-border bg-background px-3 py-2">
@@ -341,6 +416,7 @@ function HearingRow({ h, onDelete }: { h: Hearing; onDelete: () => void }) {
         <div className="flex items-center gap-2">
           <Calendar className="h-3.5 w-3.5 text-primary" />
           <span className="text-sm font-medium">{h.title}</span>
+          {multiProc && <ProcTag label={h.procLabel} />}
           <Badge variant="outline" className="text-[9px]">
             {upcoming ? "未召开" : "已召开"}
           </Badge>
@@ -387,24 +463,29 @@ function HearingRow({ h, onDelete }: { h: Hearing; onDelete: () => void }) {
   );
 }
 
-// ============ 备忘录 ============
+// ============ 备忘（全案聚合）============
 
 function MemosCard({
-  procedureId,
-  memos
+  memos,
+  addProcedureId,
+  multiProc
 }: {
-  procedureId: string;
-  memos: ProcedureMemo[];
+  memos: MemoRowItem[];
+  /** 新增备忘归属的程序（当前选中程序） */
+  addProcedureId: string;
+  multiProc: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const [draft, setDraft] = useState("");
 
+  const canAdd = !!addProcedureId;
+
   function handleAdd() {
     const content = draft.trim();
-    if (!content) return;
+    if (!content || !addProcedureId) return;
     startTransition(async () => {
       try {
-        await addProcedureMemo({ procedureId, content });
+        await addProcedureMemo({ procedureId: addProcedureId, content });
         setDraft("");
       } catch (err) {
         toast.error("添加失败", { description: err instanceof Error ? err.message : "" });
@@ -424,14 +505,14 @@ function MemosCard({
 
   return (
     <section className="rounded-xl border border-border bg-card p-5">
-      <header className="mb-4 flex items-center justify-between">
+      <header className="mb-3 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <StickyNote className="h-4 w-4 text-primary" />
-          备忘录 <span className="text-muted-foreground">({memos.length})</span>
+          备忘 <span className="text-muted-foreground">({memos.length})</span>
         </h3>
       </header>
 
-      {/* 添加 */}
+      {/* 添加：归到当前选中程序 */}
       <div className="mb-3 flex items-center gap-2">
         <Input
           value={draft}
@@ -442,13 +523,14 @@ function MemosCard({
               handleAdd();
             }
           }}
-          placeholder="记一条备忘，回车添加"
-          className="h-8 text-sm"
+          placeholder={canAdd ? "记一条备忘，回车添加" : "请先添加程序"}
+          disabled={!canAdd}
+          className="h-8 text-xs"
         />
         <Button
           size="sm"
           onClick={handleAdd}
-          disabled={isPending || !draft.trim()}
+          disabled={isPending || !canAdd || !draft.trim()}
           className="h-8 shrink-0 gap-1"
         >
           {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
@@ -462,14 +544,17 @@ function MemosCard({
           还没有备忘
         </p>
       ) : (
-        <ul className="space-y-1.5">
+        // 无外边框、密排、小字号——在有限空间尽量多容内容
+        <ul className="divide-y divide-border/60">
           {memos.map((m) => (
-            <li
-              key={m.id}
-              className="group flex items-start gap-2 rounded-md border border-border bg-background px-3 py-2"
-            >
-              <span className="flex-1 whitespace-pre-wrap break-words text-sm">
+            <li key={m.id} className="group flex items-start gap-2 py-1.5">
+              <span className="flex-1 whitespace-pre-wrap break-words text-xs leading-relaxed">
                 {m.content}
+                {multiProc && (
+                  <span className="ml-1.5 align-middle text-[10px] text-muted-foreground/70">
+                    · {m.procLabel}
+                  </span>
+                )}
               </span>
               <button
                 type="button"

@@ -32,11 +32,11 @@ export function ToolsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[88vh] w-[92vw] max-w-3xl flex-col gap-0 p-0">
+      <DialogContent className="flex max-h-[88vh] w-[92vw] max-w-[460px] flex-col gap-0 p-0">
         <DialogHeader className="border-b border-border px-5 py-3">
           <DialogTitle className="flex items-center gap-2">
             <Calculator className="h-4 w-4 text-primary" />
-            律师工具箱
+            实务工具
           </DialogTitle>
         </DialogHeader>
 

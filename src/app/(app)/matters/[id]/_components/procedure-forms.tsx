@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, useRef, useState } from "react";
+import { useTransition, useRef, useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -17,14 +17,6 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter
-} from "@/components/ui/sheet";
 import {
   Dialog,
   DialogContent,
@@ -259,14 +251,17 @@ const deadlineCategoryLabel: Record<
   CUSTOM: "其他"
 };
 
-export function AddDeadlineSheet({
+export function AddDeadlineDialog({
   open,
   onOpenChange,
-  procedureId
+  procedures,
+  defaultProcedureId
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  procedureId: string;
+  /** v0.45：提醒全案聚合，新增期限需明确所处程序 */
+  procedures: { id: string; label: string }[];
+  defaultProcedureId: string;
 }) {
   const [isPending, startTransition] = useTransition();
 
@@ -280,7 +275,7 @@ export function AddDeadlineSheet({
   } = useForm<DeadlineCreateInput>({
     resolver: zodResolver(deadlineCreateSchema),
     defaultValues: {
-      procedureId,
+      procedureId: defaultProcedureId,
       title: "",
       category: "CUSTOM",
       dueAt: new Date(),
@@ -288,6 +283,11 @@ export function AddDeadlineSheet({
       remindDays: 3
     }
   });
+
+  // 打开时把所处程序默认值同步为当前选中程序
+  useEffect(() => {
+    if (open) setValue("procedureId", defaultProcedureId);
+  }, [open, defaultProcedureId, setValue]);
 
   function onSubmit(values: DeadlineCreateInput) {
     startTransition(async () => {
@@ -305,14 +305,32 @@ export function AddDeadlineSheet({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full max-w-md flex-col gap-0 p-0">
-        <SheetHeader className="border-b border-border bg-background px-6 py-4">
-          <SheetTitle>添加期限</SheetTitle>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[85vh] max-w-md flex-col gap-0 p-0">
+        <DialogHeader className="border-b border-border px-6 py-4">
+          <DialogTitle>添加期限</DialogTitle>
+        </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 flex-col">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 flex-col overflow-hidden">
           <div className="flex-1 space-y-3 overflow-y-auto px-6 py-5">
+            <Field label="所处程序" required>
+              <Select
+                value={watch("procedureId") || undefined}
+                onValueChange={(v) => setValue("procedureId", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择所处程序" />
+                </SelectTrigger>
+                <SelectContent>
+                  {procedures.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
             <Field label="期限名称" required error={errors.title?.message}>
               <Input
                 placeholder="如：举证截止 / 上诉到期日"
@@ -362,7 +380,7 @@ export function AddDeadlineSheet({
             </Field>
           </div>
 
-          <SheetFooter className="border-t border-border bg-background px-6 py-4">
+          <DialogFooter className="border-t border-border px-6 py-4">
             <Button
               type="button"
               variant="outline"
@@ -375,23 +393,26 @@ export function AddDeadlineSheet({
               {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               添加期限
             </Button>
-          </SheetFooter>
+          </DialogFooter>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-// ============ AddHearingSheet ============
+// ============ AddHearingDialog ============
 
-export function AddHearingSheet({
+export function AddHearingDialog({
   open,
   onOpenChange,
-  procedureId
+  procedures,
+  defaultProcedureId
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  procedureId: string;
+  /** v0.45：提醒全案聚合，新增开庭需明确所处程序 */
+  procedures: { id: string; label: string }[];
+  defaultProcedureId: string;
 }) {
   const [isPending, startTransition] = useTransition();
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -402,11 +423,12 @@ export function AddHearingSheet({
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors }
   } = useForm<HearingCreateInput>({
     resolver: zodResolver(hearingCreateSchema),
     defaultValues: {
-      procedureId,
+      procedureId: defaultProcedureId,
       title: "",
       startsAt: new Date(),
       endsAt: undefined,
@@ -415,6 +437,11 @@ export function AddHearingSheet({
       notes: ""
     }
   });
+
+  // 打开时把所处程序默认值同步为当前选中程序
+  useEffect(() => {
+    if (open) setValue("procedureId", defaultProcedureId);
+  }, [open, defaultProcedureId, setValue]);
 
   function handleSummonsUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -468,14 +495,32 @@ export function AddHearingSheet({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full max-w-md flex-col gap-0 p-0">
-        <SheetHeader className="border-b border-border bg-background px-6 py-4">
-          <SheetTitle>添加开庭</SheetTitle>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[85vh] max-w-md flex-col gap-0 p-0">
+        <DialogHeader className="border-b border-border px-6 py-4">
+          <DialogTitle>添加开庭</DialogTitle>
+        </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 flex-col">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 flex-col overflow-hidden">
           <div className="flex-1 space-y-3 overflow-y-auto px-6 py-5">
+            <Field label="所处程序" required>
+              <Select
+                value={watch("procedureId") || undefined}
+                onValueChange={(v) => setValue("procedureId", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择所处程序" />
+                </SelectTrigger>
+                <SelectContent>
+                  {procedures.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
             {/* 上传传票 */}
             <div className="flex items-center gap-2">
               <input
@@ -536,7 +581,7 @@ export function AddHearingSheet({
             </Field>
           </div>
 
-          <SheetFooter className="border-t border-border bg-background px-6 py-4">
+          <DialogFooter className="border-t border-border px-6 py-4">
             <Button
               type="button"
               variant="outline"
@@ -549,10 +594,10 @@ export function AddHearingSheet({
               {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               添加开庭
             </Button>
-          </SheetFooter>
+          </DialogFooter>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 

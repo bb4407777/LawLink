@@ -26,7 +26,7 @@ export function CalcView({ hideHeader }: { hideHeader?: boolean } = {}) {
         <div>
           <h1 className="flex items-center gap-2 text-2xl">
             <Calculator className="h-5 w-5 text-primary" strokeWidth={1.6} />
-            律师工具箱
+            实务工具
           </h1>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             诉讼费 / 迟延履行金 / 天数 —— 纯前端速算，无需联网

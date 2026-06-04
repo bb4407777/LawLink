@@ -5,32 +5,23 @@ import { motion } from "framer-motion";
 import type { Prisma } from "@prisma/client";
 import {
   Info,
-  FolderArchive,
-  Shield,
-  Clock,
-  Plus,
-  Scale,
-  MessageSquare,
+  Plus
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { matterStatusLabel, procedureTypeLabel, matterCategoryKind } from "@/lib/enums";
 import { cn } from "@/lib/utils";
 import { InfoPanel } from "./info-panel";
-import { DocumentsPanel, type DocumentPayload } from "./documents-panel";
 import { FinancePanel } from "./finance-panel";
-import { ProcedureContent } from "./procedure-content";
+import { ProcedureRemindersAndMemos } from "./procedure-content";
 import { ProcedureDocumentsSection } from "./procedure-documents-section";
 import { ProcedureInfoPanel } from "./procedure-info-panel";
 import { TimelinePanel } from "./timeline-panel";
-import { NotesPanel } from "./notes-panel";
-import { CustomFieldsPanel } from "./custom-fields-panel";
-import { AddProcedureSheet } from "./procedure-forms";
-import { FoldersPanel } from "./folders-panel";
-import { LifecycleActions } from "./lifecycle-actions";
-import { MatterPreservationPanel } from "./matter-preservation-panel";
-import { CaseSearchPanel } from "./case-search-panel";
 import { ApprovalsPanel } from "./approvals-panel";
 import { ExpressMiniCard, type SealContractItem, type ExpressItem } from "./info-extras";
+import { AddProcedureSheet } from "./procedure-forms";
+import { MatterPreservationPanel } from "./matter-preservation-panel";
+import { CustomFieldsPanel } from "./custom-fields-panel";
+import { LifecycleActions } from "./lifecycle-actions";
 import { ArchiveStatusBanner } from "./archive-status-banner";
 import { ArchiveWizardDialog } from "./archive-wizard";
 import type { FolderPayload, FolderDocument, TemplateSummary } from "./folder-types";
@@ -123,13 +114,10 @@ export type NotePayload = {
   createdAt: Date;
 };
 
-type TabKey = "info" | "documents" | "preservation" | "cases" | "companies" | "notes" | "timeline" | `proc:${string}`;
-
 export function MatterDetailTabs({
   matter,
   finance,
   userOptions,
-  notes,
   documents,
   intakeContracts,
   folders,
@@ -146,9 +134,8 @@ export function MatterDetailTabs({
   matter: MatterPayload;
   finance: FinancePayload;
   userOptions: UserOption[];
-  notes: NotePayload[];
-  documents: DocumentPayload[];
-  intakeContracts: DocumentPayload[];
+  documents: any[];
+  intakeContracts: any[];
   folders: FolderPayload[];
   folderDocuments: FolderDocument[];
   templates: TemplateSummary[];
@@ -175,7 +162,7 @@ export function MatterDetailTabs({
     required: boolean;
   }[];
 }) {
-  const [tab, setTab] = useState<TabKey>("info");
+  const [selectedProcId, setSelectedProcId] = useState<string | null>(null);
   const [addProcOpen, setAddProcOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
 
@@ -183,11 +170,32 @@ export function MatterDetailTabs({
     .filter((p) => p.engagement === "ENGAGED")
     .sort((a, b) => a.order - b.order);
 
+  // 默认选中第一个在办程序（若有）
+  const currentProcedure = selectedProcId
+    ? engagedProcedures.find((p) => p.id === selectedProcId)
+    : engagedProcedures[0] ?? null;
+
   const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+
+  // 当前选中程序的文档
+  const procDocs = currentProcedure
+    ? documents
+        .filter((d) => d.procedureId === currentProcedure.id)
+        .map((d) => ({
+          id: d.id,
+          name: d.name,
+          category: d.category,
+          mimeType: d.mimeType,
+          size: d.size,
+          createdAt: d.createdAt,
+          sourceParty: d.sourceParty,
+          path: d.path
+        }))
+    : [];
 
   return (
     <div className="space-y-4">
-      {/* H1 头部 - 精简：仅标题 + 状态 + 导出 + 状态操作 */}
+      {/* H1 头部 */}
       <motion.header
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
@@ -208,7 +216,7 @@ export function MatterDetailTabs({
         )}
       </motion.header>
 
-      {/* v0.18: 归档状态 banner（驳回 / 审批中） */}
+      {/* 归档状态 banner */}
       {latestArchive && (
         <motion.div
           initial={{ opacity: 0, y: 4 }}
@@ -227,216 +235,127 @@ export function MatterDetailTabs({
         </motion.div>
       )}
 
-      {/* Tabs */}
+      {/* 单页竖向布局 */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.05 }}
+        className="space-y-4"
       >
-        <div
-          className="flex items-end gap-1 overflow-x-auto border-b border-border scrollbar-none"
-        >
-          <TabButton active={tab === "info"} onClick={() => setTab("info")}>
-            <Info className="h-3.5 w-3.5" strokeWidth={1.8} />
-            基本信息
-          </TabButton>
+        {/* 1. 案件信息 + 自定义字段 */}
+        <InfoPanel
+          matter={matter}
+          userOptions={userOptions}
+          finance={finance}
+          contracts={intakeContracts.map((d) => ({ id: d.id, name: d.name }))}
+        />
+        <CustomFieldsPanel
+          matterId={matter.id}
+          defs={customFieldDefs}
+          values={
+            (matter.customValues &&
+            typeof matter.customValues === "object" &&
+            !Array.isArray(matter.customValues)
+              ? (matter.customValues as Record<string, string>)
+              : {})
+          }
+        />
 
-          <span className="mb-3.5 h-3 w-px bg-border" />
-
-          {engagedProcedures.map((p, idx) => {
-            const key: TabKey = `proc:${p.id}`;
-            return (
-              <TabButton key={p.id} active={tab === key} onClick={() => setTab(key)}>
-                <span className="text-primary font-medium text-[11px]">{ROMAN[idx] ?? idx + 1}</span>
-                <span>{p.customLabel ?? procedureTypeLabel[p.type]}</span>
-                {p.status === "CONCLUDED" && (
-                  <Badge
-                    variant="outline"
-                    className="ml-0.5 border-border bg-muted/30 px-1 text-[9px] font-normal"
+        {/* 2. 案件程序（新容器） */}
+        <section className="rounded-xl border border-border bg-card p-5">
+          {/* 程序切换标签 */}
+          <header className="mb-4 flex flex-wrap items-center gap-2 border-b border-border pb-3">
+            <span className="text-[13px] font-medium">案件程序</span>
+            {engagedProcedures.length === 0 ? (
+              <span className="text-xs text-muted-foreground">暂无在办程序</span>
+            ) : (
+              engagedProcedures.map((p, idx) => {
+                const isActive = currentProcedure?.id === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedProcId(p.id)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition-colors",
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-muted/60"
+                    )}
                   >
-                    已结
-                  </Badge>
-                )}
-              </TabButton>
-            );
-          })}
-
-          <button
-            type="button"
-            onClick={() => setAddProcOpen(true)}
-            className="mb-3 inline-flex items-center gap-1 px-1 text-xs text-primary hover:text-primary/80"
-          >
-            <Plus className="h-3 w-3" strokeWidth={2} />
-            添加程序
-          </button>
-
-          <span className="mb-3.5 h-3 w-px bg-border" />
-
-          {/*
-            v0.27: 案卷材料 tab 取消，材料合并到各程序下的"案件材料"区。
-            DocumentsPanel 代码保留（供后续可能的"全部材料"视图用），UI 入口隐藏。
-          */}
-          {false && (
-            <TabButton active={tab === "documents"} onClick={() => setTab("documents")}>
-              <FolderArchive className="h-3.5 w-3.5" strokeWidth={1.8} />
-              案卷材料
-              {documents.length > 0 && (
-                <span className="ml-1 font-mono text-[10px] tabular text-muted-foreground">
-                  {documents.length}
-                </span>
-              )}
-            </TabButton>
-          )}
-
-          <TabButton active={tab === "preservation"} onClick={() => setTab("preservation")}>
-            <Shield className="h-3.5 w-3.5" strokeWidth={1.8} />
-            保全
-            {preservations.length > 0 && (
-              <span className="ml-1 font-mono text-[10px] tabular text-muted-foreground">
-                {preservations.length}
-              </span>
+                    <span className="font-medium text-primary">{ROMAN[idx] ?? idx + 1}</span>
+                    <span>{p.customLabel ?? procedureTypeLabel[p.type]}</span>
+                    {p.status === "CONCLUDED" && (
+                      <Badge
+                        variant="outline"
+                        className="ml-0.5 border-border bg-muted/30 px-1 text-[9px] font-normal"
+                      >
+                        已结
+                      </Badge>
+                    )}
+                  </button>
+                );
+              })
             )}
-          </TabButton>
+            <button
+              type="button"
+              onClick={() => setAddProcOpen(true)}
+              className="ml-1 inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+            >
+              <Plus className="h-3 w-3" strokeWidth={2} />
+              添加程序
+            </button>
+          </header>
 
-          {/*
-            v0.27: 类案 tab 暂时隐藏（功能完整保留在 case-search-panel.tsx，PRD §A3 已说明）。
-            未来开放时去掉此 false 即可。
-          */}
-          {false && (
-            <TabButton active={tab === "cases"} onClick={() => setTab("cases")}>
-              <Scale className="h-3.5 w-3.5" strokeWidth={1.8} />
-              类案
-            </TabButton>
-          )}
-
-          <div className="flex-1" />
-
-          {/* v0.43: 「沟通」tab 暂时隐藏（NotesPanel 代码保留，去掉 false 即恢复） */}
-          {false && (
-            <TabButton active={tab === "notes"} onClick={() => setTab("notes")}>
-              <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.8} />
-              沟通
-              {notes.length > 0 && (
-                <span className="ml-1 font-mono text-[10px] tabular text-muted-foreground">
-                  {notes.length}
-                </span>
-              )}
-            </TabButton>
-          )}
-
-          <TabButton active={tab === "timeline"} onClick={() => setTab("timeline")}>
-            <Clock className="h-3.5 w-3.5" strokeWidth={1.8} />
-            时间线
-          </TabButton>
-        </div>
-
-        <div className="mt-4">
-          {tab === "info" && (
+          {/* 当前程序内容：基本信息 + 案件材料 + 提醒/备忘（全案聚合） */}
+          {currentProcedure ? (
             <div className="space-y-4">
-              <InfoPanel
-                matter={matter}
-                userOptions={userOptions}
-                finance={finance}
-                contracts={intakeContracts.map((d) => ({ id: d.id, name: d.name }))}
-              />
-              <ApprovalsPanel
+              <ProcedureInfoPanel procedure={currentProcedure} />
+              <ProcedureDocumentsSection
                 matterId={matter.id}
-                matterTitle={matter.title}
-                sealContracts={sealContracts}
+                procedureId={currentProcedure.id}
+                documents={procDocs}
+                parties={matter.parties}
               />
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-                <div className="lg:col-span-8">
-                  <FinancePanel matterId={matter.id} finance={finance} userOptions={userOptions} />
-                </div>
-                <div className="lg:col-span-4">
-                  <ExpressMiniCard expresses={expresses} matterId={matter.id} />
-                </div>
-              </div>
-              <CustomFieldsPanel
-                matterId={matter.id}
-                defs={customFieldDefs}
-                values={
-                  (matter.customValues &&
-                  typeof matter.customValues === "object" &&
-                  !Array.isArray(matter.customValues)
-                    ? (matter.customValues as Record<string, string>)
-                    : {})
-                }
+              <ProcedureRemindersAndMemos
+                procedures={engagedProcedures}
+                currentProcedureId={currentProcedure.id}
               />
             </div>
+          ) : (
+            <p className="py-8 text-center text-xs text-muted-foreground">
+              请先添加程序以管理开庭、期限和案件材料
+            </p>
           )}
-          {/* v0.27: 案卷材料 tab 内容不再渲染（材料挪到各程序下） */}
-          {false && tab === "documents" && (
-            <div className="space-y-4">
-              <FoldersPanel
-                matterId={matter.id}
-                matterCategory={matter.category}
-                folders={folders}
-                documents={folderDocuments}
-                templates={templates}
-              />
-              <DocumentsPanel
-                matterId={matter.id}
-                matterStatus={matter.status}
-                documents={documents}
-                procedures={matter.procedures.map((p) => ({
-                  id: p.id,
-                  label: p.customLabel ?? p.type
-                }))}
-                folders={folders.map((f) => ({ id: f.id, name: f.name }))}
-              />
-            </div>
-          )}
-          {tab === "preservation" && (
-            <MatterPreservationPanel
-              matterId={matter.id}
-              matterCode={matter.internalCode}
-              matterTitle={matter.title}
-              preservations={preservations}
-              users={colleagues}
-            />
-          )}
-          {/* v0.27: 类案 tab 暂时隐藏 */}
-          {false && tab === "cases" && (
-            <CaseSearchPanel
-              matterId={matter.id}
-              matterCategory={matter.category}
-              defaultCauseName={matter.cause?.name ?? null}
-            />
-          )}
-          {/* v0.43: 沟通 tab 隐藏 */}
-          {false && tab === "notes" && <NotesPanel matterId={matter.id} notes={notes} />}
-          {tab === "timeline" && <TimelinePanel events={matter.timelineEvents} />}
+        </section>
 
-          {engagedProcedures.map((p) => {
-            if (tab !== `proc:${p.id}`) return null;
-            const procDocs = documents
-              .filter((d) => d.procedureId === p.id)
-              .map((d) => ({
-                id: d.id,
-                name: d.name,
-                category: d.category,
-                mimeType: d.mimeType,
-                size: d.size,
-                createdAt: d.createdAt,
-                sourceParty: d.sourceParty,
-                path: d.path
-              }));
-            return (
-              <div key={p.id} className="space-y-4">
-                <ProcedureInfoPanel procedure={p} />
-                {/* v0.43：案件材料移到「程序基本信息」下、「重要时限/备忘录」之上 */}
-                <ProcedureDocumentsSection
-                  matterId={matter.id}
-                  procedureId={p.id}
-                  documents={procDocs}
-                  parties={matter.parties}
-                />
-                <ProcedureContent procedure={p} />
-              </div>
-            );
-          })}
+        {/* 3. 用印审批 */}
+        <ApprovalsPanel
+          matterId={matter.id}
+          matterTitle={matter.title}
+          sealContracts={sealContracts}
+        />
+
+        {/* 4. 财务费用 | 快递 */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+          <div className="lg:col-span-8">
+            <FinancePanel matterId={matter.id} finance={finance} userOptions={userOptions} />
+          </div>
+          <div className="lg:col-span-4">
+            <ExpressMiniCard expresses={expresses} matterId={matter.id} />
+          </div>
         </div>
+
+        {/* 5. 保全 */}
+        <MatterPreservationPanel
+          matterId={matter.id}
+          matterCode={matter.internalCode}
+          matterTitle={matter.title}
+          preservations={preservations}
+          users={colleagues}
+        />
+
+        {/* 6. 时间线 */}
+        <TimelinePanel events={matter.timelineEvents} />
       </motion.div>
 
       <AddProcedureSheet
@@ -489,37 +408,6 @@ function MatterStatusPill({ status }: { status: MatterPayload["status"] }) {
     >
       {m.label}
     </span>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "group relative inline-flex shrink-0 items-center gap-1.5 rounded-t-md px-3 pb-2.5 pt-2 text-[13px] transition-colors",
-        active
-          ? "bg-card text-primary font-medium border border-b-transparent border-border"
-          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-      )}
-    >
-      {children}
-      {active && (
-        <span
-          aria-hidden
-          className="absolute -bottom-px left-0 right-0 h-[2px] bg-primary"
-        />
-      )}
-    </button>
   );
 }
 

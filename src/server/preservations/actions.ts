@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
 import { assertMatterWritable } from "@/lib/archive/guard";
+import { assertCanAccessMatter } from "@/lib/permissions";
 import {
   preservationCreateSchema,
   preservationUpdateSchema,
@@ -95,6 +96,7 @@ export async function createPreservation(input: z.infer<typeof preservationCreat
       select: { id: true }
     });
     if (!m) throw new Error("关联案件不存在");
+    await assertCanAccessMatter(session.user.id, session.user.role, data.matterId);
     await assertMatterWritable(data.matterId);
   }
 
@@ -144,9 +146,15 @@ export async function updatePreservation(input: z.infer<typeof preservationUpdat
     select: { id: true, matterId: true }
   });
   if (!existing) throw new Error("保全记录不存在");
-  await assertMatterWritable(existing.matterId);
+  if (existing.matterId) {
+    await assertCanAccessMatter(session.user.id, session.user.role, existing.matterId);
+    await assertMatterWritable(existing.matterId);
+  }
   if (matterId !== undefined && matterId !== existing.matterId) {
-    await assertMatterWritable(matterId);
+    if (matterId) {
+      await assertCanAccessMatter(session.user.id, session.user.role, matterId);
+      await assertMatterWritable(matterId);
+    }
   }
 
   if (rest.startDate && rest.expiryDate && rest.expiryDate <= rest.startDate) {
@@ -191,7 +199,10 @@ export async function renewPreservation(input: z.infer<typeof preservationRenewS
   });
   if (!pres) throw new Error("保全记录不存在");
   if (pres.status === "LIFTED") throw new Error("已解除的保全不可续保");
-  await assertMatterWritable(pres.matterId);
+  if (pres.matterId) {
+    await assertCanAccessMatter(session.user.id, session.user.role, pres.matterId);
+    await assertMatterWritable(pres.matterId);
+  }
   if (data.newExpiryDate <= pres.expiryDate) {
     throw new Error(`新到期日必须晚于原到期日（${pres.expiryDate.toISOString().slice(0, 10)}）`);
   }
@@ -239,7 +250,10 @@ export async function liftPreservation(input: z.infer<typeof preservationLiftSch
     select: { id: true, matterId: true, note: true }
   });
   if (!pres) throw new Error("保全记录不存在");
-  await assertMatterWritable(pres.matterId);
+  if (pres.matterId) {
+    await assertCanAccessMatter(session.user.id, session.user.role, pres.matterId);
+    await assertMatterWritable(pres.matterId);
+  }
 
   await prisma.preservation.update({
     where: { id: data.id },
@@ -274,7 +288,10 @@ export async function deletePreservation(input: z.infer<typeof preservationIdSch
     select: { id: true, matterId: true }
   });
   if (!pres) throw new Error("保全记录不存在");
-  await assertMatterWritable(pres.matterId);
+  if (pres.matterId) {
+    await assertCanAccessMatter(session.user.id, session.user.role, pres.matterId);
+    await assertMatterWritable(pres.matterId);
+  }
 
   await prisma.preservation.delete({ where: { id: data.id } });
 
