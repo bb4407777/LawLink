@@ -70,7 +70,14 @@ npx prisma db seed                # 创建 admin 账号 + 案由库样本
 npm run dev
 ```
 
-打开 http://localhost:3000，用 `.env` 里的 `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` 登录。
+打开 http://localhost:3000，用初始管理员账号登录：
+
+- 邮箱：`admin@lawlink.local`
+- 密码：`ChangeMe!2026`
+
+以上值来自 `.env.example`。如果你已经修改过 `.env` 里的 `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`，以 `.env` 中的实际值为准。公开部署或正式试用前，请先把 `SEED_ADMIN_PASSWORD` 改成强密码，再执行 seed；首次登录后也应在系统设置中修改密码。
+
+旧版本用户说明：如果你此前已经从 GitHub 下载过 LawLink，并且已经执行过 `npx prisma db seed`，更新 README 或 `.env.example` 不会自动修改数据库里已有管理员的密码。请优先使用当时 `.env` 中的 `SEED_ADMIN_PASSWORD` 登录；如果当时沿用了旧版占位值，密码可能是 `REPLACE_BEFORE_FIRST_LOGIN`。忘记密码时，可以重新初始化本地测试数据库，或在数据库中重置管理员密码哈希。
 
 本地开发使用 `.next-dev`，生产构建使用 `.next-build`，避免 `npm run build` 后覆盖正在运行的开发缓存导致页面不渲染。
 
