@@ -87,11 +87,9 @@ export function InfoPanel({
     if (!s && !e) return "—";
     return `${s ? formatDate(s) : "—"} ~ ${e ? formatDate(e) : "—"}`;
   };
-  // v0.42 项11：案件信息表展示「所内案号」（状态已在页头 Pill 体现）
-  const firmCaseNoCell = matter.firmCaseNo ? (
-    <span className="font-mono tabular text-[12px]">{matter.firmCaseNo}</span>
-  ) : (
-    <span className="text-muted-foreground">—</span>
+  // 系统编号（原 v0.42 firmCaseNo 已合并至 internalCode）
+  const internalCodeCell = (
+    <span className="font-mono tabular text-[12px]">{matter.internalCode}</span>
   );
   const claimCell = matter.claimAmount ? (
     <span className="font-mono tabular">¥{Number(matter.claimAmount).toLocaleString()}</span>
@@ -107,7 +105,7 @@ export function InfoPanel({
           <span className="text-[13px] font-medium">
             基本信息
             <span className="ml-1.5 font-mono text-[11px] font-normal tabular text-muted-foreground/70">
-              丨 {matter.firmCaseNo || matter.internalCode}
+              丨 {matter.internalCode}
             </span>
           </span>
           {canEditMatter && (
@@ -213,9 +211,11 @@ export function InfoPanel({
           open={teamEditorOpen}
           onOpenChange={setTeamEditorOpen}
           matterId={matter.id}
+          financeStats={finance.stats}
           matterMeta={{
             internalCode: matter.internalCode,
             intakeDate: matter.intakeDate ?? null,
+            status: matter.status,
             category: matter.category,
             title: matter.title,
             causeId: matter.causeId ?? null,

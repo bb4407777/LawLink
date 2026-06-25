@@ -71,6 +71,10 @@ export const PARTY_TYPE_OPTIONS: PartyType[] = [
   "OTHER_ORG"
 ];
 
+// v0.46: 对方当事人库（复用 PartyType 标签）
+export const opposingPartyTypeLabel = partyTypeLabel;
+export const OPPOSING_PARTY_TYPE_OPTIONS = PARTY_TYPE_OPTIONS;
+
 // v0.30: 需向律协备案与否
 export const barFilingLabel: Record<BarFilingType, string> = {
   NONE: "否",
@@ -94,7 +98,7 @@ export type CategoryKind = "litigation" | "project" | "counsel";
 
 export function matterCategoryKind(c: MatterCategory): CategoryKind {
   if (c === "LEGAL_COUNSEL") return "counsel";
-  if (c === "NON_LITIGATION" || c === "SPECIAL_PROJECT") return "project";
+  if (c === "NON_LITIGATION" || c === "SPECIAL_PROJECT" || c === "AGENT_FILING" || c === "CONSULTATION" || c === "PUBLIC_SOURCE") return "project";
   // 民商诉讼 / 劳动仲裁 / 商事仲裁 / 刑事 / 行政 → 诉讼/仲裁类
   return "litigation";
 }
@@ -125,7 +129,10 @@ export const matterCategoryLabel: Record<MatterCategory, string> = {
   ADMINISTRATIVE: "行政诉讼",
   NON_LITIGATION: "非诉项目",
   LEGAL_COUNSEL: "常年顾问",
-  SPECIAL_PROJECT: "法律专项"
+  SPECIAL_PROJECT: "法律专项",
+  AGENT_FILING: "代立案",
+  CONSULTATION: "咨询",
+  PUBLIC_SOURCE: "公共案源"
 };
 
 export const matterCategoryColor: Record<MatterCategory, string> = {
@@ -136,7 +143,10 @@ export const matterCategoryColor: Record<MatterCategory, string> = {
   ADMINISTRATIVE: "#FBBF24",
   NON_LITIGATION: "#4FD1C5",
   LEGAL_COUNSEL: "#9B7BF7",
-  SPECIAL_PROJECT: "#60A5FA"
+  SPECIAL_PROJECT: "#60A5FA",
+  AGENT_FILING: "#E879F9",
+  CONSULTATION: "#22D3EE",
+  PUBLIC_SOURCE: "#FB923C"
 };
 
 // v0.17: 案件类别单字图标（用于列表卡片标题前）
@@ -148,14 +158,43 @@ export const matterCategoryShort: Record<MatterCategory, string> = {
   ADMINISTRATIVE: "行",
   NON_LITIGATION: "非",
   LEGAL_COUNSEL: "顾",
-  SPECIAL_PROJECT: "专"
+  SPECIAL_PROJECT: "专",
+  AGENT_FILING: "代",
+  CONSULTATION: "咨",
+  PUBLIC_SOURCE: "公"
 };
 
 export const matterStatusLabel: Record<MatterStatus, string> = {
-  PENDING_ACCEPTANCE: "待启动",
+  PENDING_ACCEPTANCE: "新案件",
   IN_PROGRESS: "办理中",
+  FILING_MATERIALS: "做立案材料",
+  FILING_MATERIALS_SIGN: "立案材料待签名",
+  ONLINE_FILING: "做网上立案",
+  ONLINE_FILING_REVIEW: "网上立案待审核",
+  FILING_ACCEPTED: "网上立案通过",
+  FEE_PAYMENT_PENDING: "交费单待交费",
+  FEE_PAID: "交费单交费后",
+  HEARING_SCHEDULED: "有开庭时间",
+  POST_HEARING: "庭后未判决",
+  POST_JUDGMENT: "判决后待上诉",
+  EXECUTION_MATERIALS: "做执行资料",
+  EXECUTION_MATERIALS_SIGN: "执行材料待签名",
+  EXECUTION_ONLINE_FILING: "做执行网上立案",
+  EXECUTION_ONLINE_REVIEW: "执行网上立案待审核",
+  EXECUTION_PRESERVATION: "执行保全阶段",
+  EXECUTION: "执行阶段",
+  INVESTIGATION: "侦查阶段",
+  DETENTION_30: "拘留30天",
+  ARREST_REVIEW_7: "审查逮捕7天",
+  POST_ARREST_REVIEW: "审查逮捕后",
+  CUSTODY_NECESSITY: "羁押必要性审查10天",
+  BAIL_PENDING: "取保候审",
+  PROSECUTION_REVIEW: "检察院审查起诉",
+  TRIAL: "一审阶段",
+  CRIMINAL_EXECUTION: "二审阶段",
   ON_HOLD: "暂停",
   CLOSED: "已结案",
+  PENDING_ARCHIVE: "待归档",
   ARCHIVED: "已归档"
 };
 
@@ -190,6 +229,7 @@ export const litigationStandingLabel: Record<LitigationStanding, string> = {
   ENFORCEMENT_APPLICANT: "申请执行人",
   EXECUTED_PERSON: "被执行人",
   CRIMINAL_DEFENDANT: "刑事被告人",
+  CRIMINAL_DEFENDANT_FAMILY: "被告人家属",
   CRIMINAL_VICTIM: "被害人",
   PRIVATE_PROSECUTOR: "自诉人",
   CRIMINAL_INCIDENTAL_PLAINTIFF: "刑事附带民事原告",
@@ -294,6 +334,7 @@ export function procedureToStandingOptions(
     case "COMMUTATION_PAROLE_REVIEW":
       return [
         "CRIMINAL_DEFENDANT",
+        "CRIMINAL_DEFENDANT_FAMILY",
         "CRIMINAL_VICTIM",
         "PRIVATE_PROSECUTOR",
         "CRIMINAL_INCIDENTAL_PLAINTIFF"

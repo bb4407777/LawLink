@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import type { ProcedureType } from "@prisma/client";
+import { procedureTypeLabel } from "@/lib/enums";
 import { requireSession } from "@/lib/auth/session";
 import { audit } from "@/server/audit";
 import { assertMatterWritable } from "@/lib/archive/guard";
@@ -27,11 +29,36 @@ function emptyToNull<T extends Record<string, unknown>>(obj: T): T {
 
 // ============ Procedure ============
 
+/** 添加程序时自动追加（一审）（二审）等后缀到案件标题 */
+const PROCEDURE_TITLE_SUFFIX_TYPES: ProcedureType[] = [
+  "FIRST_INSTANCE", "SECOND_INSTANCE", "RETRIAL_REVIEW", "RETRIAL",
+  "REMAND_FIRST", "REMAND_SECOND", "PROSECUTORIAL_SUPERVISION"
+];
+
+async function appendProcedureSuffixToTitle(matterId: string, type: ProcedureType) {
+  const label = procedureTypeLabel[type];
+  const suffix = `（${label}）`;
+  if (!PROCEDURE_TITLE_SUFFIX_TYPES.includes(type)) return;
+  const matter = await prisma.matter.findUnique({
+    where: { id: matterId },
+    select: { title: true }
+  });
+  if (matter && !matter.title.includes(suffix)) {
+    await prisma.matter.update({
+      where: { id: matterId },
+      data: { title: `${matter.title}${suffix}` }
+    });
+  }
+}
+
 export async function addProcedure(input: ProcedureCreateInput) {
   const session = await requireSession();
   const data = procedureCreateSchema.parse(input);
   await assertCanAccessMatter(session.user.id, session.user.role, data.matterId);
   await assertMatterWritable(data.matterId);
+
+  // 先追加程序后缀到标题，再创建程序
+  await appendProcedureSuffixToTitle(data.matterId, data.type);
 
   const lastOrder = await prisma.matterProcedure.findFirst({
     where: { matterId: data.matterId },

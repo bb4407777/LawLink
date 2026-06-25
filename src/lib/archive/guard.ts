@@ -28,7 +28,6 @@ async function findWritableMatter(
   return prisma.matter.findFirst({
     where: {
       id: matterId,
-      deletedAt: null,
       ...(allowByFinanceRole ? {} : matterAssociationFilter(session.user.id))
     },
     select: { status: true, archivedAt: true }
@@ -45,12 +44,7 @@ export async function assertMatterWritable(
   if (!matterId) return;
   const matter = await findWritableMatter(matterId, opts);
   if (!matter) throw new Error("案件不存在或无权处理");
-  if (matter.status === "ARCHIVED") {
-    const detail = opts?.allowedIfArchivedReason
-      ? `（${opts.allowedIfArchivedReason}除外）`
-      : "";
-    throw new Error(`案件已归档，禁止修改${detail}`);
-  }
+  // 归档不设只读（2026-06-17 取消）
 }
 
 /**

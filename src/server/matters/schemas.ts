@@ -8,14 +8,43 @@ export const matterCategorySchema = z.enum([
   "ADMINISTRATIVE",
   "NON_LITIGATION",
   "LEGAL_COUNSEL",
-  "SPECIAL_PROJECT"
+  "SPECIAL_PROJECT",
+  "AGENT_FILING",
+  "CONSULTATION",
+  "PUBLIC_SOURCE"
 ]);
 
 export const matterStatusSchema = z.enum([
   "PENDING_ACCEPTANCE",
   "IN_PROGRESS",
+  "FILING_MATERIALS",
+  "FILING_MATERIALS_SIGN",
+  "ONLINE_FILING",
+  "ONLINE_FILING_REVIEW",
+  "FILING_ACCEPTED",
+  "FEE_PAYMENT_PENDING",
+  "FEE_PAID",
+  "HEARING_SCHEDULED",
+  "POST_HEARING",
+  "POST_JUDGMENT",
+  "EXECUTION_MATERIALS",
+  "EXECUTION_MATERIALS_SIGN",
+  "EXECUTION_ONLINE_FILING",
+  "EXECUTION_ONLINE_REVIEW",
+  "EXECUTION_PRESERVATION",
+  "EXECUTION",
+  "INVESTIGATION",
+  "DETENTION_30",
+  "ARREST_REVIEW_7",
+  "POST_ARREST_REVIEW",
+  "CUSTODY_NECESSITY",
+  "BAIL_PENDING",
+  "PROSECUTION_REVIEW",
+  "TRIAL",
+  "CRIMINAL_EXECUTION",
   "ON_HOLD",
   "CLOSED",
+  "PENDING_ARCHIVE",
   "ARCHIVED"
 ]);
 
@@ -34,6 +63,7 @@ export const litigationStandingSchema = z.enum([
   "ENFORCEMENT_APPLICANT",
   "EXECUTED_PERSON",
   "CRIMINAL_DEFENDANT",
+  "CRIMINAL_DEFENDANT_FAMILY",
   "CRIMINAL_VICTIM",
   "PRIVATE_PROSECUTOR",
   "CRIMINAL_INCIDENTAL_PLAINTIFF",
@@ -142,7 +172,7 @@ export const matterCreateSchema = z.object({
   category: matterCategorySchema,
 
   // 案由
-  causeId: z.string().cuid().optional().or(z.literal("")),
+  causeId: z.string().optional().or(z.literal("")),
   causeFreeText: z.string().max(200).optional().or(z.literal("")),
 
   claimAmount: z.coerce.number().nonnegative().optional(),
@@ -154,7 +184,7 @@ export const matterCreateSchema = z.object({
   intakeDate: z.coerce.date().optional(),
 
   // 客户：至少一个，第一个默认 primary
-  clientIds: z.array(z.string().cuid()).min(1, "至少选择一个委托方"),
+  clientIds: z.array(z.string()).min(1, "至少选择一个委托方"),
 
   // 当事人列表（委托方、对方、第三人）
   parties: z.array(partyInputSchema).default([]),
@@ -174,12 +204,16 @@ export type PartyInput = z.infer<typeof partyInputSchema>;
 
 // v0.27: 案件基本信息编辑（系统编号 / 收案日期 readonly，不在此处）
 export const matterUpdateBasicSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
+  internalCode: z.string().min(1).max(40),
+  intakeDate: z.coerce.date().optional().nullable(),
+  status: matterStatusSchema.optional(),
+  category: matterCategorySchema,
   title: z.preprocess(
     (v) => (typeof v === "string" ? v.replace(/\s+/g, "") : v),
     z.string().min(1, "案件名称必填").max(200)
   ),
-  causeId: z.string().cuid().optional().or(z.literal("")),
+  causeId: z.string().optional().or(z.literal("")),
   causeFreeText: z.string().max(200).optional().or(z.literal("")),
   claimAmount: z.coerce.number().nonnegative().optional().nullable(),
   ourStanding: litigationStandingSchema.optional().nullable()
@@ -190,14 +224,16 @@ export type MatterUpdateBasicInput = z.infer<typeof matterUpdateBasicSchema>;
 export const matterListQuerySchema = z.object({
   search: z.string().optional(),
   category: matterCategorySchema.optional(),
+  categoryIn: z.array(matterCategorySchema).optional(),
   status: matterStatusSchema.optional(),
   statusIn: z.array(matterStatusSchema).optional(),
   statusNotIn: z.array(matterStatusSchema).optional(),
-  ownerId: z.string().cuid().optional(),
-  clientId: z.string().cuid().optional(),
+  includeDeleted: z.boolean().optional(),
+  ownerId: z.string().optional(),
+  clientId: z.string().optional(),
   intakeDateFrom: z.coerce.date().optional(),
   intakeDateTo: z.coerce.date().optional(),
-  sortBy: z.enum(["hearing", "intakeDate", "claimAmount"]).default("intakeDate"),
+  sortBy: z.enum(["hearing", "intakeDate", "claimAmount", "contractAmount", "receivedAmount", "internalCode"]).default("intakeDate"),
   sortDir: z.enum(["asc", "desc"]).default("desc"),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20)

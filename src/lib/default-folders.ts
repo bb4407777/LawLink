@@ -13,7 +13,10 @@ export const DEFAULT_FOLDERS_BY_CATEGORY: Record<MatterCategory, readonly string
   CRIMINAL: ["收案", "委托手续", "阅卷", "会见", "取证", "庭前", "庭审", "判决与上诉", "结案"],
   NON_LITIGATION: ["立项", "调研", "工作底稿", "出具文件", "归档"],
   LEGAL_COUNSEL: ["立项", "调研", "工作底稿", "出具文件", "归档"],
-  SPECIAL_PROJECT: ["立项", "调研", "工作底稿", "出具文件", "归档"]
+  SPECIAL_PROJECT: ["立项", "调研", "工作底稿", "出具文件", "归档"],
+  AGENT_FILING: ["收案", "委托手续", "证据", "文书", "归档"],
+  CONSULTATION: ["收案", "记录", "出具文件", "归档"],
+  PUBLIC_SOURCE: ["收案", "记录", "出具文件", "归档"]
 } as const;
 
 /**

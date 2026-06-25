@@ -54,7 +54,7 @@ export function IntakesTable({
   }
 
   return (
-    <div className="ll-surface overflow-hidden rounded-lg">
+    <div className="ll-surface rounded-lg">
       <CaseListHeader />
       <ul>
         {items.map((it) => {

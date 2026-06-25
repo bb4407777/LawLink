@@ -1,0 +1,12 @@
+{
+  "version": "5.2",
+  "steps": [
+    {
+      "tag": "CreateField",
+      "model": "Client",
+      "field": "wechat",
+      "type": "String",
+      "optional": true
+    }
+  ]
+}

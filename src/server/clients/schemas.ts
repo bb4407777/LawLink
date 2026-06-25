@@ -39,7 +39,7 @@ export const clientCreateSchema = z.object({
 });
 
 export const clientUpdateSchema = clientCreateSchema.extend({
-  id: z.string().cuid()
+  id: z.string()
 });
 
 export type ClientCreateInput = z.infer<typeof clientCreateSchema>;

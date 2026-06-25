@@ -4,6 +4,7 @@ import {
   getMonthlyRevenue,
   getPersonalRevenue
 } from "@/server/finance/actions";
+import { getMattersRevenueTrend } from "@/server/matters/overview-stats";
 import { listInvoiceRequests, getInvoiceStats } from "@/server/invoices/actions";
 import { FinanceView } from "./_components/finance-view";
 
@@ -11,13 +12,17 @@ export default async function FinancePage() {
   const session = await getSession();
   const userId = session!.user.id;
 
-  const [entries, monthly, personal, invoiceRequests, invoiceStats] = await Promise.all([
-    listAllFeeEntries({ limit: 200 }),
+  const [entries, monthly, personal, invoiceRequests, invoiceStats, fullTrend] = await Promise.all([
+    listAllFeeEntries({ limit: 9999 }),
     getMonthlyRevenue(6),
     getPersonalRevenue(userId),
     listInvoiceRequests(),
-    getInvoiceStats()
+    getInvoiceStats(),
+    getMattersRevenueTrend()
   ]);
+
+  // Serialize Decimal → plain number for Client Component
+  const serializedEntries = JSON.parse(JSON.stringify(entries));
 
   const monthStart = new Date();
   monthStart.setDate(1);
@@ -36,7 +41,7 @@ export default async function FinancePage() {
 
   return (
     <FinanceView
-      entries={entries}
+      entries={serializedEntries}
       monthly={monthly}
       stats={{
         monthlyReceived,
@@ -47,6 +52,7 @@ export default async function FinancePage() {
         monthlyIssued: invoiceStats.monthlyIssued,
         pendingInvoiceCount: invoiceStats.pendingCount
       }}
+      fullTrend={fullTrend}
       invoiceRequests={invoiceRequests}
       canApproveInvoice={
         session!.user.role === "FINANCE" ||

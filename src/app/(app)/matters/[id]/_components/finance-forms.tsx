@@ -33,7 +33,9 @@ import {
 } from "@/server/finance/schemas";
 import {
   createBilling,
+  upsertBillingContractAmount,
   createFeeEntry,
+  upsertFeeEntryByType,
   setCommissionPlan,
   listMatterInvoiceRequests
 } from "@/server/finance/actions";
@@ -75,7 +77,7 @@ export function AddBillingSheet({
   function onSubmit(values: BillingCreateInput) {
     startTransition(async () => {
       try {
-        await createBilling(values);
+        await upsertBillingContractAmount(matterId, values.contractAmount);
         if (contractFile) {
           const fd = new FormData();
           fd.set("matterId", matterId);
@@ -85,9 +87,9 @@ export function AddBillingSheet({
           fd.set("tags", `合同,${values.title}`);
           fd.set("file", contractFile);
           await uploadDocument(fd);
-          toast.success("合同已创建，附件已加密入库");
+          toast.success("合同已更新，附件已加密入库");
         } else {
-          toast.success("合同已创建");
+          toast.success("合同已更新");
         }
         reset();
         setContractFile(null);
@@ -247,9 +249,9 @@ export function AddFeeEntrySheet({
   function onSubmit(values: FeeEntryCreateInput) {
     startTransition(async () => {
       try {
-        await createFeeEntry(values);
+        await upsertFeeEntryByType(matterId, values.type as "RECEIVABLE" | "RECEIVED" | "REFUND" | "COST", values.amount, values.occurredAt);
         toast.success(
-          values.type === "RECEIVED" ? "实收已录入，分成已自动计算" : "记录已创建"
+          values.type === "RECEIVED" ? "实收已更新" : "已更新"
         );
         reset();
         onOpenChange(false);

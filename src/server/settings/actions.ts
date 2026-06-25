@@ -69,7 +69,7 @@ export async function upsertStageTemplate(input: TemplateUpdateInput) {
 
 const auditQuerySchema = z.object({
   action: z.string().optional(),
-  userId: z.string().cuid().optional(),
+  userId: z.string().optional(),
   days: z.coerce.number().int().min(1).max(365).default(30),
   limit: z.coerce.number().int().min(1).max(500).default(200)
 });

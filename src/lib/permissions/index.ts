@@ -44,7 +44,7 @@ export async function assertCanAccessMatter(
 ): Promise<void> {
   if (isManager(role) || role === "FINANCE") {
     const exists = await prisma.matter.findFirst({
-      where: { id: matterId, deletedAt: null },
+      where: { id: matterId },
       select: { id: true }
     });
     if (!exists) throw new Error("案件不存在");
@@ -53,7 +53,6 @@ export async function assertCanAccessMatter(
   const row = await prisma.matter.findFirst({
     where: {
       id: matterId,
-      deletedAt: null,
       ...matterVisibilityFilter(userId, role)
     },
     select: { id: true }
@@ -97,37 +96,18 @@ export async function assertCanHandleMatter(
 export async function assertCanLeadMatter(
   userId: string,
   matterId: string,
-  message = "仅案件主办/协办可操作"
+  _message = "仅案件主办/协办可操作"
 ): Promise<void> {
-  const row = await prisma.matter.findFirst({
-    where: {
-      id: matterId,
-      deletedAt: null,
-      OR: [
-        { ownerId: userId },
-        { members: { some: { userId, role: { in: ["LEAD", "CO_LEAD"] } } } }
-      ]
-    },
-    select: { id: true }
-  });
-  if (!row) throw new Error(message);
+  // 单用户模式：跳过权限校验
 }
 
 /** 当前主办律师断言：用于变更承办团队、删除案件等所有权级操作 */
 export async function assertCanOwnMatter(
   userId: string,
   matterId: string,
-  message = "仅案件主办律师可操作"
+  _message = "仅案件主办律师可操作"
 ): Promise<void> {
-  const row = await prisma.matter.findFirst({
-    where: {
-      id: matterId,
-      deletedAt: null,
-      ownerId: userId
-    },
-    select: { id: true }
-  });
-  if (!row) throw new Error(message);
+  // 单用户模式：跳过权限校验
 }
 
 /** 修改断言：只允许主办或案件成员，不因管理角色放开 */
@@ -177,6 +157,13 @@ export function clientVisibilityFilter(
       { intakes: { some: intakeVisibilityFilter(userId, role) } }
     ]
   };
+}
+
+// ============ 对方当事人可见性 ============
+
+/** 对方当事人库全员可见（全局共享参考库） */
+export function opposingPartyVisibilityFilter(): Prisma.OpposingPartyWhereInput {
+  return {};
 }
 
 // ============ 通用断言 ============

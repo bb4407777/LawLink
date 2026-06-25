@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { AlertTriangle, Calendar, ArrowRight } from "lucide-react";
+import { AlertTriangle, Calendar, ClipboardList, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ScheduleItem } from "@/server/dashboard/actions";
 
 const typeMeta = {
   deadline: { icon: AlertTriangle, color: "text-amber-600", label: "期限" },
-  hearing: { icon: Calendar, color: "text-primary", label: "开庭" }
+  hearing: { icon: Calendar, color: "text-primary", label: "开庭" },
+  task: { icon: ClipboardList, color: "text-emerald-600", label: "事项" }
 };
 
 export function ScheduleList({ data }: { data: ScheduleItem[] }) {
@@ -50,10 +51,7 @@ export function ScheduleList({ data }: { data: ScheduleItem[] }) {
           <div key={dateKey}>
             <div className="mb-2 flex items-center gap-2.5">
               <div className="text-[0.9rem] font-medium text-foreground">
-                {dateKey.split(" · ")[0]}
-              </div>
-              <div className="text-[0.68rem] text-muted-foreground">
-                {dateKey.split(" · ")[1]}
+                {dateKey.split(" · ")[0]}（{dateKey.split(" · ")[1]}）
               </div>
               <div className="ll-rule flex-1" />
             </div>

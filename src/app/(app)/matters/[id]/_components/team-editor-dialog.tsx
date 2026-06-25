@@ -11,7 +11,7 @@
 import { useState, useTransition, useEffect } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import type { LitigationStanding, MatterCategory } from "@prisma/client";
+import type { LitigationStanding, MatterCategory, MatterStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,7 +34,8 @@ import {
 import {
   userRoleLabel,
   litigationStandingLabel,
-  matterCategoryLabel
+  matterCategoryLabel,
+  matterStatusLabel
 } from "@/lib/enums";
 import {
   standingsByCategory
@@ -43,14 +44,24 @@ import {
   updateMatterTeam,
   updateMatterBasicInfo
 } from "@/server/matters/actions";
+import { upsertBillingContractAmount } from "@/server/finance/actions";
 import { CauseCombobox } from "@/app/(app)/matters/_components/cause-combobox";
-import { formatDate } from "@/lib/utils";
 
 type UserOption = { id: string; name: string; role: string };
 
+type FinanceStats = {
+  contractAmount: number;
+  receivable: number;
+  received: number;
+  refund: number;
+  cost: number;
+  commission: number;
+};
+
 type MatterMeta = {
   internalCode: string;
-  intakeDate: Date | null;
+  intakeDate: string | Date | null;
+  status: string;
   category: MatterCategory;
   title: string;
   causeId: string | null;
@@ -64,6 +75,7 @@ type Props = {
   onOpenChange: (o: boolean) => void;
   matterId: string;
   matterMeta: MatterMeta;
+  financeStats: FinanceStats;
   currentOwnerId: string;
   currentMembers: { userId: string; role: "LEAD" | "CO_LEAD" | "ASSISTANT"; name: string }[];
   userOptions: UserOption[];
@@ -74,12 +86,23 @@ export function TeamEditorDialog({
   onOpenChange,
   matterId,
   matterMeta,
+  financeStats,
   currentOwnerId,
   currentMembers,
   userOptions
 }: Props) {
   // 基本信息字段
   const [title, setTitle] = useState(matterMeta.title);
+  const [editInternalCode, setEditInternalCode] = useState(matterMeta.internalCode);
+  const [editIntakeDate, setEditIntakeDate] = useState(
+    matterMeta.intakeDate
+      ? (typeof matterMeta.intakeDate === "string"
+          ? matterMeta.intakeDate.slice(0, 10)
+          : matterMeta.intakeDate.toISOString().slice(0, 10))
+      : ""
+  );
+  const [editCategory, setEditCategory] = useState<MatterCategory>(matterMeta.category);
+  const [editStatus, setEditStatus] = useState<string>(matterMeta.status);
   const [causeId, setCauseId] = useState<string>(matterMeta.causeId ?? "");
   const [causeFreeText, setCauseFreeText] = useState(matterMeta.causeFreeText ?? "");
   const [claimAmount, setClaimAmount] = useState<string>(
@@ -88,6 +111,7 @@ export function TeamEditorDialog({
   const [ourStanding, setOurStanding] = useState<LitigationStanding | "">(
     matterMeta.ourStanding ?? ""
   );
+  const [contractAmount, setContractAmount] = useState("");
 
   // 团队字段
   const [ownerId, setOwnerId] = useState(currentOwnerId);
@@ -100,24 +124,58 @@ export function TeamEditorDialog({
 
   const [isPending, startTransition] = useTransition();
 
+  const { contractAmount: caStats } = financeStats;
+
   useEffect(() => {
     if (open) {
       setTitle(matterMeta.title);
+      setEditInternalCode(matterMeta.internalCode);
+      setEditIntakeDate(
+  matterMeta.intakeDate
+    ? (typeof matterMeta.intakeDate === "string"
+        ? matterMeta.intakeDate.slice(0, 10)
+        : matterMeta.intakeDate.toISOString().slice(0, 10))
+    : ""
+);
+      setEditCategory(matterMeta.category);
+      setEditStatus(matterMeta.status);
       setCauseId(matterMeta.causeId ?? "");
       setCauseFreeText(matterMeta.causeFreeText ?? "");
       setClaimAmount(matterMeta.claimAmount === null ? "" : String(matterMeta.claimAmount));
       setOurStanding(matterMeta.ourStanding ?? "");
+      setContractAmount(caStats > 0 ? String(caStats) : "");
       setOwnerId(currentOwnerId);
       setCoLeads(currentMembers.filter((m) => m.role === "CO_LEAD").map((m) => m.userId));
       setAssistants(currentMembers.filter((m) => m.role === "ASSISTANT").map((m) => m.userId));
     }
-  }, [open, matterMeta, currentOwnerId, currentMembers]);
+  }, [open, matterMeta, caStats, currentOwnerId, currentMembers]);
 
   function toggle(list: string[], setList: (v: string[]) => void, id: string) {
     setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
   }
 
   const availableStandings = standingsByCategory[matterMeta.category];
+
+  // 按案件类型过滤状态选项
+  const CIVIL_STATUSES = new Set([
+    'PENDING_ACCEPTANCE','IN_PROGRESS','FILING_MATERIALS','FILING_MATERIALS_SIGN',
+    'ONLINE_FILING','ONLINE_FILING_REVIEW','FILING_ACCEPTED','FEE_PAYMENT_PENDING',
+    'FEE_PAID','HEARING_SCHEDULED','POST_HEARING','POST_JUDGMENT',
+    'EXECUTION_MATERIALS','EXECUTION_MATERIALS_SIGN','EXECUTION_ONLINE_FILING',
+    'EXECUTION_ONLINE_REVIEW','EXECUTION_PRESERVATION','EXECUTION'
+  ]);
+  const CRIMINAL_STATUSES = new Set([
+    'INVESTIGATION','DETENTION_30','ARREST_REVIEW_7','POST_ARREST_REVIEW',
+    'CUSTODY_NECESSITY','BAIL_PENDING','PROSECUTION_REVIEW','TRIAL','CRIMINAL_EXECUTION'
+  ]);
+  const COMMON_STATUSES = new Set(['ON_HOLD','CLOSED','PENDING_ARCHIVE','ARCHIVED']);
+
+  function statusOptionsForCategory(cat: string): (keyof typeof matterStatusLabel)[] {
+    if (cat === 'CRIMINAL' || cat === 'NON_LITIGATION') {
+      return [...CRIMINAL_STATUSES, ...COMMON_STATUSES] as (keyof typeof matterStatusLabel)[];
+    }
+    return [...CIVIL_STATUSES, ...COMMON_STATUSES] as (keyof typeof matterStatusLabel)[];
+  }
 
   function handleSave() {
     startTransition(async () => {
@@ -136,6 +194,10 @@ export function TeamEditorDialog({
         // 串行：先基本信息，再团队（避免一个失败时已部分写入）
         await updateMatterBasicInfo({
           id: matterId,
+          internalCode: editInternalCode,
+          intakeDate: editIntakeDate ? new Date(editIntakeDate) : null,
+          status: editStatus as MatterStatus,
+          category: editCategory,
           title,
           causeId: causeId || "",
           causeFreeText: causeFreeText || "",
@@ -149,6 +211,12 @@ export function TeamEditorDialog({
           coLeadIds: coLeads,
           assistantIds: assistants
         });
+
+        // 财务：合同额（仅修改，不自动生成收付记录）
+        const ca = parseFloat(contractAmount);
+        if (ca > 0) {
+          await upsertBillingContractAmount(matterId, ca);
+        }
 
         toast.success("案件信息已更新");
         onOpenChange(false);
@@ -166,24 +234,64 @@ export function TeamEditorDialog({
         <DialogHeader>
           <DialogTitle>编辑案件</DialogTitle>
           <DialogDescription className="text-xs">
-            系统编号、收案日期、类别不可修改；其他字段由当前主办律师维护。
+            所有字段由当前主办律师维护。
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
-          {/* readonly 行 */}
-          <section className="grid grid-cols-3 gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
-            <div>
-              <div className="text-[10px] text-muted-foreground">系统编号</div>
-              <div className="font-mono">{matterMeta.internalCode}</div>
+          {/* 系统信息 */}
+          <section className="grid grid-cols-4 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">系统编号</Label>
+              <Input
+                value={editInternalCode}
+                onChange={(e) => setEditInternalCode(e.target.value)}
+                className="font-mono"
+              />
             </div>
-            <div>
-              <div className="text-[10px] text-muted-foreground">收案日</div>
-              <div>{matterMeta.intakeDate ? formatDate(matterMeta.intakeDate) : "—"}</div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">收案日期</Label>
+              <Input
+                type="date"
+                value={editIntakeDate}
+                onChange={(e) => setEditIntakeDate(e.target.value)}
+              />
             </div>
-            <div>
-              <div className="text-[10px] text-muted-foreground">类别</div>
-              <div>{matterCategoryLabel[matterMeta.category]}</div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">状态</Label>
+              <Select
+                value={editStatus}
+                onValueChange={setEditStatus}
+              >
+                <SelectTrigger className="h-10 bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptionsForCategory(editCategory).map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {matterStatusLabel[s]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">类别</Label>
+              <Select
+                value={editCategory}
+                onValueChange={(v) => setEditCategory(v as MatterCategory)}
+              >
+                <SelectTrigger className="h-10 bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(["CIVIL_COMMERCIAL","LABOR_ARBITRATION","COMMERCIAL_ARBITRATION","CRIMINAL","ADMINISTRATIVE","NON_LITIGATION","LEGAL_COUNSEL","SPECIAL_PROJECT","AGENT_FILING","CONSULTATION","PUBLIC_SOURCE"] as MatterCategory[]).map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {matterCategoryLabel[c]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </section>
 
@@ -250,10 +358,28 @@ export function TeamEditorDialog({
                 </Select>
               </div>
             </div>
+
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <h3 className="text-xs font-medium text-muted-foreground mb-3">财务</h3>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">合同额（元）</Label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    value={contractAmount}
+                    onChange={(e) => setContractAmount(e.target.value)}
+                    placeholder="0"
+                    className="font-mono h-9"
+                  />
+                </div>
+              </div>
+            </div>
           </section>
 
-          {/* 团队 */}
-          <section className="space-y-3 border-t border-border pt-4">
+          {/* 团队（已隐藏，保留结构） */}
+          <section className="hidden space-y-3 border-t border-border pt-4">
             <h3 className="text-xs font-medium text-muted-foreground">承办团队</h3>
 
             <div className="space-y-1.5">

@@ -92,7 +92,7 @@ const intakeInclude = Prisma.validator<Prisma.IntakeInclude>()({
   cause: { select: { name: true } },
   ownerUser: { select: { id: true, name: true } },
   parties: { orderBy: [{ role: "asc" }, { ordinal: "asc" }] },
-  matter: { select: { id: true, internalCode: true, firmCaseNo: true, title: true } },
+  matter: { select: { id: true, internalCode: true, title: true } },
   documents: {
     where: { deletedAt: null },
     orderBy: { createdAt: "desc" },
@@ -161,10 +161,10 @@ const matterInclude = Prisma.validator<Prisma.MatterInclude>()({
     select: { name: true, relationship: true, notes: true }
   },
   linksFrom: {
-    include: { relatedMatter: { select: { internalCode: true, firmCaseNo: true, title: true } } }
+    include: { relatedMatter: { select: { internalCode: true, title: true } } }
   },
   linksTo: {
-    include: { matter: { select: { internalCode: true, firmCaseNo: true, title: true } } }
+    include: { matter: { select: { internalCode: true, title: true } } }
   },
   documents: {
     where: { deletedAt: null },
@@ -416,7 +416,6 @@ function buildMatterWhere(params: MattersExportParams, user: ExportUser): Prisma
       OR: [
         { title: { contains: params.search, mode: "insensitive" } },
         { internalCode: { contains: params.search, mode: "insensitive" } },
-        { firmCaseNo: { contains: params.search, mode: "insensitive" } },
         { primaryClient: { name: { contains: params.search, mode: "insensitive" } } },
         { cause: { name: { contains: params.search, mode: "insensitive" } } },
         { parties: { some: { name: { contains: params.search, mode: "insensitive" } } } },
@@ -429,11 +428,11 @@ function buildMatterWhere(params: MattersExportParams, user: ExportUser): Prisma
 
 function matterStatusWhere(params: MattersExportParams): Prisma.MatterWhereInput {
   if (params.tab === "archived") return { status: { in: ["ARCHIVED"] } };
-  if (params.tab === "active") return { status: { notIn: ["CLOSED", "ARCHIVED"] } };
+  if (params.tab === "active") return { status: { notIn: ["ARCHIVED", "PENDING_ARCHIVE"] } };
   if (params.status === "active") return { status: { in: ["IN_PROGRESS", "ON_HOLD"] } };
-  if (params.status === "closed") return { status: { in: ["CLOSED"] } };
+  if (params.status === "pendingArchive") return { status: { in: ["PENDING_ARCHIVE"] } };
   if (params.status === "archived") return { status: { in: ["ARCHIVED"] } };
-  return { status: { in: ["IN_PROGRESS", "ON_HOLD", "CLOSED", "ARCHIVED"] } };
+  return { status: { in: ["IN_PROGRESS", "ON_HOLD", "PENDING_ARCHIVE", "ARCHIVED"] } };
 }
 
 function intakeOrderBy(params: MattersExportParams): Prisma.IntakeOrderByWithRelationInput[] {
@@ -563,7 +562,6 @@ function matterColumnsForKind(
 ): Partial<ExcelJS.Column>[] {
   const commonStart: Partial<ExcelJS.Column>[] = [
     { header: "系统编号", key: "internalCode", width: 16 },
-    { header: "所内案号", key: "firmCaseNo", width: 18 },
     { header: "案件名称", key: "title", width: 38 },
     { header: "案件分类", key: "category", width: 12 },
     { header: "案件状态", key: "status", width: 12 },
@@ -739,7 +737,7 @@ function buildIntakeRow(intake: IntakeExportRow, coUserNames: Map<string, string
     parties: formatParties(intake.parties),
     documents: formatDocuments(intake.documents),
     matter: intake.matter
-      ? `${intake.matter.firmCaseNo ?? intake.matter.internalCode} ${intake.matter.title}`
+      ? `${intake.matter.internalCode} ${intake.matter.title}`
       : "",
     declinedReason: intake.declinedReason ?? "",
     createdAt: formatDateTime(intake.createdAt),
@@ -759,7 +757,6 @@ function buildMatterRow(
   const source = matter.intake;
   const row: Record<string, unknown> = {
     internalCode: matter.internalCode,
-    firmCaseNo: matter.firmCaseNo ?? "",
     title: matter.title,
     category: matterCategoryLabel[matter.category],
     status: matterStatusLabel[matter.status],
@@ -940,7 +937,7 @@ function formatRelatedMatters(matter: MatterExportRow) {
   const from = matter.linksFrom.map((link) => link.relatedMatter);
   const to = matter.linksTo.map((link) => link.matter);
   return [...from, ...to]
-    .map((row) => `${row.firmCaseNo ?? row.internalCode} ${row.title}`)
+    .map((row) => `${row.internalCode} ${row.title}`)
     .join("；");
 }
 

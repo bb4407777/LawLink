@@ -18,7 +18,7 @@ export const procedureOutcomeSchema = z.enum([
 ]);
 
 export const procedureCreateSchema = z.object({
-  matterId: z.string().cuid(),
+  matterId: z.string(),
   type: procedureTypeSchema,
   customLabel: z.string().max(40).optional().or(z.literal("")),
   engagement: procedureEngagementSchema.default("ENGAGED"),
@@ -29,12 +29,12 @@ export const procedureCreateSchema = z.object({
   handler: z.string().max(40).optional().or(z.literal("")),
   acceptedAt: z.string().optional().nullable().transform(v => (!v ? undefined : new Date(v))),
   // v0.44: 主办律师
-  leadLawyerId: z.string().cuid().optional().nullable(),
+  leadLawyerId: z.string().optional().nullable(),
   isExternalLead: z.boolean().default(false)
 });
 
 export const procedureUpdateSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
   type: procedureTypeSchema.optional(),
   customLabel: z.string().max(40).optional().or(z.literal("")),
   caseNumber: z.string().max(80).optional().or(z.literal("")),
@@ -62,7 +62,7 @@ export const deadlineCategorySchema = z.enum([
 ]);
 
 export const deadlineCreateSchema = z.object({
-  procedureId: z.string().cuid(),
+  procedureId: z.string(),
   title: z.string().min(1, "期限名称必填").max(100),
   category: deadlineCategorySchema.default("CUSTOM"),
   dueAt: z.coerce.date(),
@@ -71,7 +71,7 @@ export const deadlineCreateSchema = z.object({
 });
 
 export const hearingCreateSchema = z.object({
-  procedureId: z.string().cuid(),
+  procedureId: z.string(),
   title: z.string().min(1, "开庭主题必填").max(80),
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date().optional(),

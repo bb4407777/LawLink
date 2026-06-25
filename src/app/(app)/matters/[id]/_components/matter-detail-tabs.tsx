@@ -16,6 +16,7 @@ import { matterStatusLabel, procedureTypeLabel, matterCategoryKind } from "@/lib
 import { cn } from "@/lib/utils";
 import { InfoPanel } from "./info-panel";
 import { FinancePanel } from "./finance-panel";
+import { NotesPanel } from "./notes-panel";
 import { ProcedureRemindersAndMemos } from "./procedure-content";
 import { ProcedureDocumentsSection } from "./procedure-documents-section";
 import { ProcedureInfoPanel } from "./procedure-info-panel";
@@ -137,7 +138,8 @@ export function MatterDetailTabs({
   sealContracts,
   expresses,
   latestArchive,
-  customFieldDefs
+  customFieldDefs,
+  notes
 }: {
   matter: MatterPayload;
   finance: FinancePayload;
@@ -172,6 +174,7 @@ export function MatterDetailTabs({
     options: string[];
     required: boolean;
   }[];
+  notes: NotePayload[];
 }) {
   const [selectedProcId, setSelectedProcId] = useState<string | null>(null);
   const [addProcOpen, setAddProcOpen] = useState(false);
@@ -238,7 +241,6 @@ export function MatterDetailTabs({
       >
         <h1 className="min-w-0 flex-1 truncate text-[0.95rem] font-medium leading-tight" title={matter.title}>
           {matter.title}
-          {matterCategoryKind(matter.category) !== "project" && "案"}
         </h1>
         <MatterStatusPill status={matter.status} />
         {currentUserRole && canLeadThisMatter && (
@@ -246,7 +248,13 @@ export function MatterDetailTabs({
             matterId={matter.id}
             status={matter.status}
             canArchive={canLeadThisMatter}
+            isDeleted={!!matter.deletedAt}
           />
+        )}
+        {matter.deletedAt && (
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs text-red-600">
+            已删除
+          </span>
         )}
       </motion.header>
 
@@ -269,36 +277,51 @@ export function MatterDetailTabs({
         </motion.div>
       )}
 
-      {/* 单页竖向布局 */}
+      {/* 单页竖向布局：基本信息+财务左栏 / 重要事项+用印右栏 */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.05 }}
-        className="grid grid-cols-1 gap-4 xl:grid-cols-5"
+        className="space-y-4"
       >
-        <div className="h-full xl:col-span-3">
-          <InfoPanel
-            matter={matter}
-            userOptions={userOptions}
-            finance={finance}
-            contracts={intakeContracts.map((d) => ({ id: d.id, name: d.name }))}
-            canEditMatter={canOwnThisMatter}
-            canManageRelatedMatters={canAssociateThisMatter}
-          />
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+          {/* 左栏：基本信息 + 财务费用 */}
+          <div className="flex flex-col gap-4 xl:col-span-3">
+            <InfoPanel
+              matter={matter}
+              userOptions={userOptions}
+              finance={finance}
+              contracts={intakeContracts.map((d) => ({ id: d.id, name: d.name }))}
+              canEditMatter={canOwnThisMatter}
+              canManageRelatedMatters={canAssociateThisMatter}
+            />
+            <FinancePanel
+              matterId={matter.id}
+              finance={finance}
+              userOptions={userOptions}
+              canRequestInvoice={canAssociateThisMatter}
+            />
+          </div>
+          {/* 右栏：重要事项 + 用印审批 */}
+          <div className="flex flex-col gap-4 xl:col-span-2">
+            <ProcedureRemindersAndMemos
+              matterId={matter.id}
+              procedures={engagedProcedures}
+              currentProcedureId={currentProcedure?.id ?? ""}
+              expresses={expresses}
+              canManage={canAssociateThisMatter}
+            />
+            <ApprovalsPanel
+              matterId={matter.id}
+              matterTitle={matter.title}
+              sealContracts={sealContracts}
+              canRequest={canAssociateThisMatter}
+            />
+          </div>
         </div>
 
-        <div className="h-full xl:col-span-2">
-          <ProcedureRemindersAndMemos
-            matterId={matter.id}
-            procedures={engagedProcedures}
-            currentProcedureId={currentProcedure?.id ?? ""}
-            expresses={expresses}
-            canManage={canAssociateThisMatter}
-          />
-        </div>
-
-        <section className="h-full rounded-lg border border-border bg-card xl:col-span-3">
-          {/* 程序切换标签 */}
+        {/* 案件程序 */}
+        <section className="rounded-lg border border-border bg-card">
           <header className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
             <span className="text-[13px] font-medium">案件程序</span>
             {engagedProcedures.length === 0 ? (
@@ -374,7 +397,6 @@ export function MatterDetailTabs({
             )}
           </header>
 
-          {/* 当前程序内容：基本信息 + 案件材料 */}
           {currentProcedure ? (
             <div className="space-y-4 p-4">
               <ProcedureInfoPanel
@@ -399,30 +421,18 @@ export function MatterDetailTabs({
           )}
         </section>
 
-        <div className="flex h-full flex-col gap-4 xl:col-span-2 [&>section]:min-h-0 [&>section]:flex-1">
-          <ApprovalsPanel
-            matterId={matter.id}
-            matterTitle={matter.title}
-            sealContracts={sealContracts}
-            canRequest={canAssociateThisMatter}
-          />
-          <FinancePanel
-            matterId={matter.id}
-            finance={finance}
-            userOptions={userOptions}
-            canRequestInvoice={canAssociateThisMatter}
-          />
+        {/* 办案记录 */}
+        <div className="rounded-lg border border-border bg-card p-4">
+          <NotesPanel matterId={matter.id} notes={notes} />
         </div>
 
         {hasCustomFields && (
-          <div className="xl:col-span-3">
-            <CustomFieldsPanel
-              matterId={matter.id}
-              defs={customFieldDefs}
-              values={customValues}
-              canEdit={canLeadThisMatter}
-            />
-          </div>
+          <CustomFieldsPanel
+            matterId={matter.id}
+            defs={customFieldDefs}
+            values={customValues}
+            canEdit={canLeadThisMatter}
+          />
         )}
 
       </motion.div>
@@ -459,9 +469,113 @@ function MatterStatusPill({ status }: { status: MatterPayload["status"] }) {
       label: matterStatusLabel.IN_PROGRESS,
       cls: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30"
     },
+    FILING_MATERIALS: {
+      label: matterStatusLabel.FILING_MATERIALS,
+      cls: "bg-orange-500/15 text-orange-700 border-orange-500/30"
+    },
+    FILING_MATERIALS_SIGN: {
+      label: matterStatusLabel.FILING_MATERIALS_SIGN,
+      cls: "bg-orange-400/15 text-orange-600 border-orange-400/30"
+    },
+    ONLINE_FILING: {
+      label: matterStatusLabel.ONLINE_FILING,
+      cls: "bg-yellow-500/15 text-yellow-700 border-yellow-500/30"
+    },
+    ONLINE_FILING_REVIEW: {
+      label: matterStatusLabel.ONLINE_FILING_REVIEW,
+      cls: "bg-yellow-400/15 text-yellow-600 border-yellow-400/30"
+    },
+    FILING_ACCEPTED: {
+      label: matterStatusLabel.FILING_ACCEPTED,
+      cls: "bg-lime-500/15 text-lime-700 border-lime-500/30"
+    },
+    FEE_PAYMENT_PENDING: {
+      label: matterStatusLabel.FEE_PAYMENT_PENDING,
+      cls: "bg-rose-500/15 text-rose-700 border-rose-500/30"
+    },
+    FEE_PAID: {
+      label: matterStatusLabel.FEE_PAID,
+      cls: "bg-rose-400/15 text-rose-600 border-rose-400/30"
+    },
+    HEARING_SCHEDULED: {
+      label: matterStatusLabel.HEARING_SCHEDULED,
+      cls: "bg-sky-500/15 text-sky-700 border-sky-500/30"
+    },
+    POST_HEARING: {
+      label: matterStatusLabel.POST_HEARING,
+      cls: "bg-indigo-500/15 text-indigo-700 border-indigo-500/30"
+    },
+    POST_JUDGMENT: {
+      label: matterStatusLabel.POST_JUDGMENT,
+      cls: "bg-violet-500/15 text-violet-700 border-violet-500/30"
+    },
+    EXECUTION_MATERIALS: {
+      label: matterStatusLabel.EXECUTION_MATERIALS,
+      cls: "bg-cyan-500/15 text-cyan-700 border-cyan-500/30"
+    },
+    EXECUTION_MATERIALS_SIGN: {
+      label: matterStatusLabel.EXECUTION_MATERIALS_SIGN,
+      cls: "bg-cyan-400/15 text-cyan-600 border-cyan-400/30"
+    },
+    EXECUTION_ONLINE_FILING: {
+      label: matterStatusLabel.EXECUTION_ONLINE_FILING,
+      cls: "bg-teal-500/15 text-teal-700 border-teal-500/30"
+    },
+    EXECUTION_ONLINE_REVIEW: {
+      label: matterStatusLabel.EXECUTION_ONLINE_REVIEW,
+      cls: "bg-teal-400/15 text-teal-600 border-teal-400/30"
+    },
+    EXECUTION_PRESERVATION: {
+      label: matterStatusLabel.EXECUTION_PRESERVATION,
+      cls: "bg-red-500/15 text-red-700 border-red-500/30"
+    },
+    EXECUTION: {
+      label: matterStatusLabel.EXECUTION,
+      cls: "bg-red-400/15 text-red-600 border-red-400/30"
+    },
+    INVESTIGATION: {
+      label: matterStatusLabel.INVESTIGATION,
+      cls: "bg-orange-600/15 text-orange-800 border-orange-600/30"
+    },
+    DETENTION_30: {
+      label: matterStatusLabel.DETENTION_30,
+      cls: "bg-orange-500/15 text-orange-700 border-orange-500/30"
+    },
+    ARREST_REVIEW_7: {
+      label: matterStatusLabel.ARREST_REVIEW_7,
+      cls: "bg-orange-400/15 text-orange-600 border-orange-400/30"
+    },
+    POST_ARREST_REVIEW: {
+      label: matterStatusLabel.POST_ARREST_REVIEW,
+      cls: "bg-amber-500/15 text-amber-700 border-amber-500/30"
+    },
+    CUSTODY_NECESSITY: {
+      label: matterStatusLabel.CUSTODY_NECESSITY,
+      cls: "bg-yellow-500/15 text-yellow-700 border-yellow-500/30"
+    },
+    BAIL_PENDING: {
+      label: matterStatusLabel.BAIL_PENDING,
+      cls: "bg-lime-500/15 text-lime-700 border-lime-500/30"
+    },
+    PROSECUTION_REVIEW: {
+      label: matterStatusLabel.PROSECUTION_REVIEW,
+      cls: "bg-amber-600/15 text-amber-800 border-amber-600/30"
+    },
+    TRIAL: {
+      label: matterStatusLabel.TRIAL,
+      cls: "bg-red-600/15 text-red-800 border-red-600/30"
+    },
+    CRIMINAL_EXECUTION: {
+      label: matterStatusLabel.CRIMINAL_EXECUTION,
+      cls: "bg-rose-500/15 text-rose-700 border-rose-500/30"
+    },
     ON_HOLD: {
       label: matterStatusLabel.ON_HOLD,
       cls: "bg-slate-400/15 text-slate-700 border-slate-400/30"
+    },
+    PENDING_ARCHIVE: {
+      label: matterStatusLabel.PENDING_ARCHIVE,
+      cls: "bg-gray-400/15 text-gray-600 border-gray-400/30"
     },
     CLOSED: {
       label: matterStatusLabel.CLOSED,
@@ -523,6 +637,7 @@ function buildProcedurePartyOptions(matter: MatterPayload) {
       enterpriseSocialCode: client.type === "INDIVIDUAL" ? null : client.idNumber,
       enterpriseName: client.type === "INDIVIDUAL" ? null : client.name,
       enterpriseBoundAt: null,
+      opposingPartyId: null,
       notes: "案件关联客户",
       createdAt: new Date(),
       updatedAt: new Date()

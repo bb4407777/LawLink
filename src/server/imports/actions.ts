@@ -158,7 +158,6 @@ async function createOneMatter(n: NormalizedRow, currentUserId: string) {
   }
 
   const internalCode = await generateInternalCode(n.category);
-  const firmCaseNo = await generateFirmCaseNo(n.category);
 
   // find-or-create 客户（名称 + 证件号）
   const existingClient = await prisma.client.findFirst({
@@ -211,7 +210,6 @@ async function createOneMatter(n: NormalizedRow, currentUserId: string) {
     const matter = await tx.matter.create({
       data: {
         internalCode,
-        firmCaseNo,
         title,
         category: n.category,
         status: n.status,
@@ -220,7 +218,7 @@ async function createOneMatter(n: NormalizedRow, currentUserId: string) {
         claimAmount: n.claimAmount ?? undefined,
         causeId,
         causeFreeText,
-        closedAt: n.status === "CLOSED" ? new Date() : null,
+        closedAt: n.status === "PENDING_ARCHIVE" ? new Date() : null,
         archivedAt: n.status === "ARCHIVED" ? new Date() : null,
         primaryClientId: clientId,
         members: { create: { userId: ownerId, role: "LEAD" } },
@@ -242,7 +240,7 @@ async function createOneMatter(n: NormalizedRow, currentUserId: string) {
             }
           : {})
       },
-      select: { id: true, internalCode: true, firmCaseNo: true, title: true }
+      select: { id: true, internalCode: true, title: true }
     });
 
     await tx.timelineEvent.create({
@@ -262,7 +260,7 @@ async function createOneMatter(n: NormalizedRow, currentUserId: string) {
 }
 
 export interface ImportResult {
-  succeeded: { rowNo: number; internalCode: string; firmCaseNo: string | null; title: string }[];
+  succeeded: { rowNo: number; internalCode: string; title: string }[];
   failed: { rowNo: number; error: string }[];
 }
 
@@ -282,7 +280,6 @@ export async function commitMatterImportAction(input: {
       succeeded.push({
         rowNo,
         internalCode: m.internalCode,
-        firmCaseNo: m.firmCaseNo,
         title: m.title
       });
     } catch (e) {

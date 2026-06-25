@@ -31,7 +31,7 @@ function requireApprover(role: string) {
   }
 }
 
-/** 按 {委托方} 与 {对方} {案由} 自动生成标题 — 案由本身通常已含"纠纷"二字 */
+/** 按 {委托方}vs{对方}{案由} 自动生成标题 — 自动去掉尾部"纠纷" */
 function generateTitle(
   clientName: string | null,
   opposingNames: string[],
@@ -39,9 +39,9 @@ function generateTitle(
 ): string {
   const left = clientName || "待补充委托方";
   const right = opposingNames.length > 0 ? opposingNames.join("、") : "待补充对方";
-  const cause = causeName ?? "案件";
+  const cause = (causeName ?? "案件").replace(/纠纷$/, "");
   // 案件名称不含空格（产品要求，与 matterCreateSchema 去空白一致）
-  return `${left}与${right}${cause}`.replace(/\s+/g, "");
+  return `${left}vs${right}${cause}`.replace(/\s+/g, "");
 }
 
 function clientTypeToPartyType(type: ClientType): PartyType {
@@ -455,9 +455,8 @@ export async function convertIntakeToMatter(intakeId: string) {
   if (!intake) throw new Error("Intake 不存在");
   if (intake.status === "CONVERTED") throw new Error("此 Intake 已转化");
 
-  const { generateInternalCode, generateFirmCaseNo } = await import("@/server/matters/code-generator");
+  const { generateInternalCode } = await import("@/server/matters/code-generator");
   const internalCode = await generateInternalCode(intake.category);
-  const firmCaseNo = await generateFirmCaseNo(intake.category);
 
   // 首程序类型：优先用 intake 选的，缺失按案件类别推断
   const firstProcedureType =
@@ -474,7 +473,6 @@ export async function convertIntakeToMatter(intakeId: string) {
     const m = await tx.matter.create({
       data: {
         internalCode,
-        firmCaseNo,
         title: intake.title,
         category: intake.category,
         ownerId,

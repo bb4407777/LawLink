@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Scale } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { primaryNav, secondaryNav, type NavItem } from "./nav-config";
@@ -25,6 +25,7 @@ export function Sidebar({ firm }: { firm: FirmBrand }) {
 /** 导航内容 — 桌面侧边栏和移动 Sheet 共用 */
 export function NavContent({ firm }: { firm: FirmBrand }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   return (
     <>
@@ -58,7 +59,7 @@ export function NavContent({ firm }: { firm: FirmBrand }) {
       <nav className="flex-1 overflow-y-auto px-3 py-3">
         <div className="space-y-0.5">
           {primaryNav.map((item) => (
-            <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} />
+            <NavLink key={item.href} item={item} active={isActive(pathname, item.href, searchParams)} />
           ))}
         </div>
       </nav>
@@ -68,7 +69,7 @@ export function NavContent({ firm }: { firm: FirmBrand }) {
       <div className="px-3 py-3">
         <div className="space-y-0.5">
           {secondaryNav.map((item) => (
-            <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} />
+            <NavLink key={item.href} item={item} active={isActive(pathname, item.href, searchParams)} />
           ))}
         </div>
       </div>
@@ -127,7 +128,15 @@ function NavLink({
   );
 }
 
-function isActive(pathname: string, href: string) {
+function isActive(pathname: string, href: string, searchParams?: URLSearchParams) {
   if (href === "/") return pathname === "/";
-  return pathname.startsWith(href);
+  const [hrefPath, hrefQuery] = href.split("?");
+  if (pathname !== hrefPath) return false;
+  if (!hrefQuery) return true;
+  if (!searchParams) return false;
+  const hrefParams = new URLSearchParams(hrefQuery);
+  for (const [k, v] of hrefParams) {
+    if (searchParams.get(k) !== v) return false;
+  }
+  return true;
 }

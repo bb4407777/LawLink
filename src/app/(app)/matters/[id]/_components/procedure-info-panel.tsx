@@ -256,22 +256,10 @@ function buildInitialProcedureParties(
   parties: PartyLite[],
   partyStandingOptions: LitigationStanding[]
 ) {
-  const rows = proc.procedureParties.map((row) => ({
+  return proc.procedureParties.map((row) => ({
     partyId: row.partyId,
     standing: normalizeStandingForUi(row.standing)
   }));
-  const assignedPartyIds = new Set(rows.map((row) => row.partyId));
-
-  for (const party of parties) {
-    if (assignedPartyIds.has(party.id)) continue;
-    const standing = defaultStandingForParty(proc, party, partyStandingOptions);
-    if (standing) {
-      rows.push({ partyId: party.id, standing });
-      assignedPartyIds.add(party.id);
-    }
-  }
-
-  return rows;
 }
 
 function PartyNameWithClientBadge({ party }: { party: Pick<PartyLite, "name" | "role"> }) {
@@ -328,6 +316,7 @@ function StandingName({
   standing: LitigationStanding | null;
   children: string;
 }) {
+  if (!children) return null;
   const chars = Array.from(children);
   if (chars.length === 2) {
     return (
@@ -470,14 +459,6 @@ function ProcedurePartiesSummary({
         ordinal: Math.min(...sortedRows.map((row) => row.ordinal))
       };
     }),
-    ...parties
-      .filter((party) => !assignedPartyIds.has(party.id))
-      .map((party) => ({
-        party,
-        primaryStanding: null,
-        otherStandings: [] as LitigationStanding[],
-        ordinal: party.ordinal
-      }))
   ].sort((a, b) => {
     const standingDiff =
       (a.primaryStanding ? standingRank.get(a.primaryStanding) ?? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER) -
@@ -569,6 +550,7 @@ function EditDialog({
     standings: partyStandingOptions.slice(0, 1)
   }));
   const [newProcedureParties, setNewProcedureParties] = useState<NewProcedurePartyDraft[]>([]);
+  const [deletedPartyIds, setDeletedPartyIds] = useState<Set<string>>(new Set());
   const [showNewPartyForm, setShowNewPartyForm] = useState(false);
   const [pending, startTransition] = useTransition();
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -583,6 +565,17 @@ function EditDialog({
   function hasProcedureStanding(partyId: string, standing: LitigationStanding) {
     return procedureParties.some((row) => row.partyId === partyId && row.standing === standing);
   }
+
+  function removeProcedureParty(partyId: string) {
+    setDeletedPartyIds((prev) => new Set([...prev, partyId]));
+    setProcedureParties((rows) => rows.filter((row) => row.partyId !== partyId));
+  }
+
+  const filteredParties = parties.filter(
+    (party) =>
+      procedureParties.some((row) => row.partyId === party.id) &&
+      !deletedPartyIds.has(party.id)
+  );
 
   function setNewPartyFormValue<K extends keyof typeof newPartyForm>(
     key: K,
@@ -686,6 +679,7 @@ function EditDialog({
           acceptedAt: form.acceptedAt || null,
           concludedAt: form.concludedAt || null,
           procedureParties,
+          deletedPartyIds: Array.from(deletedPartyIds),
           newProcedureParties: newProcedureParties.map(({ existingPartyId, name, role, partyType, idNumber, enterpriseSocialCode, standings }) => ({
             existingPartyId,
             name,
@@ -696,6 +690,7 @@ function EditDialog({
             standings
           }))
         });
+        setDeletedPartyIds(new Set());
         toast.success("已保存");
         onSaved();
       } catch (err) {
@@ -777,18 +772,26 @@ function EditDialog({
                 {showNewPartyForm ? "收起" : "添加"}
               </Button>
             </div>
-            {parties.length === 0 ? (
+            {filteredParties.length === 0 && newProcedureParties.length === 0 ? (
               <div className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
-                暂无案件当事人
+                暂无程序当事人，请添加
               </div>
             ) : (
               <div className="max-h-72 overflow-y-auto rounded-md border border-border">
-                {parties.map((party) => (
+                {filteredParties.map((party) => (
                   <div key={party.id} className="border-t border-border p-2 first:border-t-0">
                     <div className="mb-2 flex min-w-0 items-center gap-2">
                       <span className="min-w-0 truncate text-xs font-medium" title={party.name}>
                         <PartyNameWithClientBadge party={party} />
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => removeProcedureParty(party.id)}
+                        className="ml-auto rounded p-0.5 text-muted-foreground hover:text-destructive"
+                        title="从本程序中移除"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
                       {party.standing && (
                         <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                           {litigationStandingLabel[normalizeStandingForUi(party.standing)]}

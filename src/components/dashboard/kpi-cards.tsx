@@ -35,7 +35,7 @@ export function KpiCards({ data }: { data: KpiItem[] }) {
           <div className="mt-3 flex items-baseline gap-1">
             <span className="ll-stat text-[2rem] leading-none text-foreground">
               {kpi.valueFormat === "currency"
-                ? formatCurrency(kpi.value, { compact: true })
+                ? formatCurrency(kpi.value)
                 : kpi.value}
             </span>
           </div>

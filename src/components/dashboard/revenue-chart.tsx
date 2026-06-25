@@ -11,7 +11,7 @@ import {
   CartesianGrid
 } from "recharts";
 
-export function RevenueChart({ data }: { data: { month: string; received: number; receivable: number }[] }) {
+export function RevenueChart({ data, title = "近 6 个月实收趋势", onClick }: { data: { month: string; received: number; receivable: number }[]; title?: string; onClick?: (month: string) => void }) {
   return (
     <motion.section
       initial={{ opacity: 0, y: 8 }}
@@ -21,7 +21,7 @@ export function RevenueChart({ data }: { data: { month: string; received: number
     >
       <header className="flex items-center justify-between px-5 pb-3 pt-4">
         <div>
-          <h2 className="text-lg font-medium tracking-tight">近 6 个月实收趋势</h2>
+          <h2 className="text-lg font-medium tracking-tight">{title}</h2>
         </div>
         <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
           <Legend color="hsl(var(--primary))" label="实收" thick />
@@ -31,7 +31,14 @@ export function RevenueChart({ data }: { data: { month: string; received: number
 
       <div className="border-t border-border flex-1 p-2 pt-3">
         <ResponsiveContainer width="100%" height="100%" minHeight={240}>
-          <AreaChart data={data} margin={{ top: 10, right: 16, bottom: 0, left: -8 }}>
+          <AreaChart
+            data={data}
+            margin={{ top: 10, right: 16, bottom: 20, left: -8 }}
+            onClick={onClick ? (e) => {
+              const label = e?.activePayload?.[0]?.payload?.month;
+              if (label) onClick(label);
+            } : undefined}
+          >
             <defs>
               <linearGradient id="received-fill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.28} />
@@ -58,16 +65,7 @@ export function RevenueChart({ data }: { data: { month: string; received: number
               tickLine={false}
               dy={6}
             />
-            <YAxis
-              tick={{
-                fill: "hsl(var(--muted-foreground))",
-                fontSize: 11,
-                fontFamily: "system-ui, sans-serif"
-              }}
-              axisLine={false}
-              tickLine={false}
-              width={40}
-            />
+            <YAxis hide={true} />
             <Tooltip
               contentStyle={{
                 backgroundColor: "hsl(var(--popover))",

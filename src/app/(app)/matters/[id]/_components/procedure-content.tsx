@@ -431,7 +431,7 @@ function DeadlineRow({
           )}
         </div>
         <div className="font-mono text-[10px] text-muted-foreground tabular">
-          {new Date(d.dueAt).toLocaleDateString("zh-CN")}
+          {new Date(d.dueAt).toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
         </div>
       </div>
 
@@ -483,6 +483,7 @@ function HearingRow({
         </Badge>
         <span className="font-mono text-[10px] tabular text-muted-foreground">
           {new Date(h.startsAt).toLocaleString("zh-CN", {
+            year: "numeric",
             month: "2-digit",
             day: "2-digit",
             hour: "2-digit",
@@ -546,8 +547,8 @@ function ExpressRow({
         </div>
         <div className="font-mono text-[10px] tabular text-muted-foreground">
           {item.lastUpdateAt
-            ? new Date(item.lastUpdateAt).toLocaleDateString("zh-CN")
-            : new Date(item.createdAt).toLocaleDateString("zh-CN")}
+            ? new Date(item.lastUpdateAt).toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+            : new Date(item.createdAt).toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
         </div>
       </div>
       {canManage && (
@@ -587,7 +588,7 @@ function MemoRow({
         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
           {multiProc && <ProcTag label={memo.procLabel} />}
           <span className="font-mono tabular">
-            {new Date(memo.createdAt).toLocaleDateString("zh-CN")}
+            {new Date(memo.createdAt).toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
           </span>
         </div>
       </div>

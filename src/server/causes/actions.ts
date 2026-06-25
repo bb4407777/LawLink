@@ -87,6 +87,12 @@ function causeScope(category: MatterCategory): {
       dbCategory: "CIVIL_COMMERCIAL",
       codePrefixes: ["CC-3", "CC-4", "CC-5", "CC-6", "CC-8", "CC-9"]
     };
+  if (category === "AGENT_FILING")
+    return { dbCategory: "NON_LITIGATION", codePrefixes: null };
+  if (category === "CONSULTATION")
+    return { dbCategory: "NON_LITIGATION", codePrefixes: null };
+  if (category === "PUBLIC_SOURCE")
+    return { dbCategory: "NON_LITIGATION", codePrefixes: null };
   return { dbCategory: category, codePrefixes: null };
 }
 

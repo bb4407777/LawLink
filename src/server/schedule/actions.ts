@@ -104,7 +104,10 @@ export async function listScheduleItems(params: {
       where: {
         dueAt: { gte: from, lte: to },
         ...(params.includeCompleted ? {} : { completed: false }),
-        matter: { deletedAt: null, ...matterFilter }
+        OR: [
+          { matterId: null },
+          { matter: { deletedAt: null, ...matterFilter } }
+        ]
       },
       include: {
         matter: {
@@ -175,8 +178,8 @@ export async function listScheduleItems(params: {
       type: "task",
       title: t.title,
       occurredAt: t.dueAt,
-      matter: matterBrief(t.matter),
-      clientName: clientNameOf(t.matter),
+      matter: t.matter ? matterBrief(t.matter) : { id: "", internalCode: "", title: "（未关联案件）" },
+      clientName: t.matter ? clientNameOf(t.matter) : null,
       completed: t.completed,
       description: t.description,
       priority: t.priority

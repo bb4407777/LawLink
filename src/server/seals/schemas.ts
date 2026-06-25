@@ -10,7 +10,7 @@ const sealTypes = [
 
 export const sealCreateSchema = z.object({
   sealType: z.enum(sealTypes),
-  matterId: z.string().cuid().optional().nullable(),
+  matterId: z.string().optional().nullable(),
   purpose: z.string().min(1, "用章事由必填").max(500),
   documentTitle: z.string().min(1, "文件标题必填").max(200),
   pageCount: z.coerce.number().int().positive().default(1),
@@ -18,21 +18,21 @@ export const sealCreateSchema = z.object({
   copies: z.coerce.number().int().positive().default(1),
   urgency: z.enum(["NORMAL", "URGENT"]).default("NORMAL"),
   requestNote: z.string().max(500).optional().or(z.literal("")),
-  parentSealRequestId: z.string().cuid().optional().nullable()
+  parentSealRequestId: z.string().optional().nullable()
 });
 
 export const sealApproveSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
   note: z.string().max(500).optional().or(z.literal(""))
 });
 
 export const sealRejectSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
   reason: z.string().min(1, "请说明驳回原因").max(500)
 });
 
 export const sealCancelSchema = z.object({
-  id: z.string().cuid()
+  id: z.string()
 });
 
 export const sealListFilterSchema = z.object({

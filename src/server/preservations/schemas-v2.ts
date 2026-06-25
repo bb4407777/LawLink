@@ -7,14 +7,14 @@ const guaranteeTypes = ["CASH_DEPOSIT", "GUARANTEE_LETTER", "PROPERTY", "NONE"] 
 // ── Case ──
 
 export const caseCreateSchema = z.object({
-  matterId: z.string().cuid().optional().nullable(),
+  matterId: z.string().optional().nullable(),
   type: z.enum(presTypes),
   court: z.string().max(80).optional().or(z.literal("")),
   rulingNumber: z.string().max(80).optional().or(z.literal("")),
   guaranteeType: z.enum(guaranteeTypes).optional().nullable(),
   appliedAt: z.coerce.date().optional().nullable(),
   note: z.string().max(500).optional().or(z.literal("")),
-  ownerId: z.string().cuid().optional().nullable(),
+  ownerId: z.string().optional().nullable(),
   remindDays: z.array(z.coerce.number().int().positive()).default([30, 15, 7, 3, 1]),
   // inline first target + property for convenience
   firstTarget: z.string().max(200).optional().or(z.literal("")),
@@ -27,15 +27,15 @@ export const caseCreateSchema = z.object({
 });
 
 export const caseUpdateSchema = z.object({
-  id: z.string().cuid(),
-  matterId: z.string().cuid().optional().nullable(),
+  id: z.string(),
+  matterId: z.string().optional().nullable(),
   type: z.enum(presTypes).optional(),
   court: z.string().max(80).optional().or(z.literal("")),
   rulingNumber: z.string().max(80).optional().or(z.literal("")),
   guaranteeType: z.enum(guaranteeTypes).optional().nullable(),
   appliedAt: z.coerce.date().optional().nullable(),
   note: z.string().max(500).optional().or(z.literal("")),
-  ownerId: z.string().cuid().optional().nullable(),
+  ownerId: z.string().optional().nullable(),
   remindDays: z.array(z.coerce.number().int().positive()).optional(),
   status: z.enum(["ACTIVE", "RENEWED", "EXPIRED", "LIFTED"]).optional(),
 });
@@ -43,13 +43,13 @@ export const caseUpdateSchema = z.object({
 // ── Target ──
 
 export const targetCreateSchema = z.object({
-  caseId: z.string().cuid(),
+  caseId: z.string(),
   name: z.string().min(1, "被保全人名称必填").max(200),
   note: z.string().max(300).optional().or(z.literal("")),
 });
 
 export const targetUpdateSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
   name: z.string().min(1).max(200).optional(),
   note: z.string().max(300).optional().or(z.literal("")),
 });
@@ -57,7 +57,7 @@ export const targetUpdateSchema = z.object({
 // ── Property ──
 
 export const propertyCreateSchema = z.object({
-  targetId: z.string().cuid(),
+  targetId: z.string(),
   propertyType: z.enum(propertyTypes),
   propertyDetail: z.string().max(500).optional().or(z.literal("")),
   amount: z.coerce.number().nonnegative().optional().nullable(),
@@ -67,7 +67,7 @@ export const propertyCreateSchema = z.object({
 });
 
 export const propertyUpdateSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
   propertyType: z.enum(propertyTypes).optional(),
   propertyDetail: z.string().max(500).optional().or(z.literal("")),
   amount: z.coerce.number().nonnegative().optional().nullable(),
@@ -78,7 +78,7 @@ export const propertyUpdateSchema = z.object({
 });
 
 export const propertyRenewSchema = z.object({
-  propertyId: z.string().cuid(),
+  propertyId: z.string(),
   newExpiryDate: z.coerce.date(),
   renewalDuration: z.coerce.number().int().positive(),
   note: z.string().max(300).optional().or(z.literal("")),
@@ -88,13 +88,13 @@ export const propertyRenewSchema = z.object({
 
 export const caseListFilterSchema = z.object({
   status: z.enum(["ACTIVE", "RENEWED", "EXPIRED", "LIFTED", "ALL"]).default("ALL"),
-  matterId: z.string().cuid().optional(),
+  matterId: z.string().optional(),
   search: z.string().max(80).optional().or(z.literal(""))
 });
 
 // ── Delete ──
 
-export const deleteSchema = z.object({ id: z.string().cuid() });
+export const deleteSchema = z.object({ id: z.string() });
 
 export type CaseCreateInput = z.infer<typeof caseCreateSchema>;
 export type CaseUpdateInput = z.infer<typeof caseUpdateSchema>;

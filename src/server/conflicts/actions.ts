@@ -29,7 +29,7 @@ const queryItemSchema = z
   });
 
 const runCheckSchema = z.object({
-  intakeId: z.string().cuid().optional(),
+  intakeId: z.string().optional(),
   queries: z.array(queryItemSchema).min(1)
 });
 
@@ -100,7 +100,7 @@ export async function runCheckAndSave(input: z.infer<typeof runCheckSchema>) {
 }
 
 const conclusionSchema = z.object({
-  checkId: z.string().cuid(),
+  checkId: z.string(),
   conclusion: z.enum(["PENDING", "SAME_SUBJECT", "DIFFERENT", "NEED_INFO"]),
   note: z.string().max(500).optional().or(z.literal(""))
 });

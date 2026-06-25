@@ -45,8 +45,8 @@ describe("批量导入 — 文本映射", () => {
   });
 
   it("标题生成无重复空格", () => {
-    expect(buildMatterTitle("张三", "某公司", "买卖合同纠纷")).toBe("张三 与 某公司 买卖合同纠纷");
-    expect(buildMatterTitle("张三", "某公司", null)).toBe("张三 与 某公司");
+    expect(buildMatterTitle("张三", "某公司", "买卖合同纠纷")).toBe("张三vs某公司买卖合同");
+    expect(buildMatterTitle("张三", "某公司", null)).toBe("张三vs某公司");
   });
 
   it("首程序类型推断与收案转化一致", () => {

@@ -22,7 +22,7 @@ export type ScheduleItem = {
   date: string;
   weekday: string;
   time?: string;
-  type: "deadline" | "hearing";
+  type: "deadline" | "hearing" | "task";
   title: string;
   matter: string;
   clientName: string | null;
@@ -34,6 +34,7 @@ export type ScheduleItem = {
 export type HeroData = {
   todayDeadlineCount: number;
   weekHearingCount: number;
+  next7dHearingCount: number;
   nearTermCount: number;
   focus: {
     title: string;
@@ -58,12 +59,19 @@ export async function getDashboardKpis(): Promise<KpiItem[]> {
   const in7d = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const [inProgress, pending, deadlines, received] = await Promise.all([
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const [inProgress, weeklyConsult, deadlines, received] = await Promise.all([
     prisma.matter.count({
-      where: { status: "IN_PROGRESS", deletedAt: null, ...mVis }
+      where: { status: { notIn: ["ARCHIVED", "CLOSED", "PENDING_ARCHIVE"] }, deletedAt: null, ...mVis }
     }),
-    prisma.intake.count({
-      where: { status: "PENDING_CONFIRMATION", ...iVis }
+    prisma.matter.count({
+      where: {
+        category: "CONSULTATION",
+        intakeDate: { gte: weekAgo },
+        deletedAt: null,
+        ...mVis
+      }
     }),
     prisma.deadline.count({
       where: {
@@ -100,11 +108,11 @@ export async function getDashboardKpis(): Promise<KpiItem[]> {
       sparkline: spark(inProgress)
     },
     {
-      key: "pending",
-      label: "待确认收案",
-      value: pending,
-      trend: { direction: "warn", text: `${pending} 待处理` },
-      sparkline: spark(pending)
+      key: "weekly_consult",
+      label: "近7天咨询",
+      value: weeklyConsult,
+      trend: { direction: "up", text: `${weeklyConsult} 件` },
+      sparkline: spark(weeklyConsult)
     },
     {
       key: "deadline",
@@ -118,7 +126,7 @@ export async function getDashboardKpis(): Promise<KpiItem[]> {
       label: "本月实收",
       value: receivedTotal,
       valueFormat: "currency",
-      trend: { direction: "up", text: `¥${(receivedTotal / 10000).toFixed(1)}万` },
+      trend: { direction: "up", text: `¥${receivedTotal.toLocaleString()}` },
       sparkline: spark(Math.round(receivedTotal / 1000))
     }
   ];
@@ -145,7 +153,7 @@ export async function getDashboardRevenueTrend(months = 6) {
   for (let i = 0; i < months; i++) {
     const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
     buckets.push({
-      month: `${d.getMonth() + 1}月`,
+      month: `${d.getFullYear()}年${d.getMonth() + 1}月`,
       received: 0,
       receivable: 0
     });
@@ -155,15 +163,14 @@ export async function getDashboardRevenueTrend(months = 6) {
     const d = new Date(e.occurredAt);
     const idx = (d.getFullYear() - start.getFullYear()) * 12 + d.getMonth() - start.getMonth();
     if (idx < 0 || idx >= months) continue;
-    const val = Number(e.amount) / 10000; // display in 万
+    const val = Number(e.amount);
     if (e.type === "RECEIVED") buckets[idx].received += val;
     if (e.type === "RECEIVABLE") buckets[idx].receivable += val;
   }
 
-  // Round to 1 decimal
   for (const b of buckets) {
-    b.received = Math.round(b.received * 10) / 10;
-    b.receivable = Math.round(b.receivable * 10) / 10;
+    b.received = Math.round(b.received);
+    b.receivable = Math.round(b.receivable);
   }
 
   return buckets;
@@ -172,12 +179,17 @@ export async function getDashboardRevenueTrend(months = 6) {
 // ============ Category Distribution ============
 
 const CATEGORY_META: Record<string, { name: string; code: string; color: string }> = {
-  CIVIL_COMMERCIAL: { name: "民商事", code: "CC", color: "#5B8DEF" },
-  NON_LITIGATION:  { name: "非诉",   code: "NL", color: "#4FD1C5" },
-  LEGAL_COUNSEL:   { name: "顾问",   code: "GC", color: "#9B7BF7" },
-  CRIMINAL:        { name: "刑事",   code: "CR", color: "#FB923C" },
-  ADMINISTRATIVE:  { name: "行政",   code: "AD", color: "#FBBF24" },
-  SPECIAL_PROJECT: { name: "专项",   code: "SP", color: "#60A5FA" }
+  CIVIL_COMMERCIAL:       { name: "民商事",   code: "CC", color: "#5B8DEF" },
+  LABOR_ARBITRATION:      { name: "劳动仲裁", code: "LA", color: "#34D399" },
+  COMMERCIAL_ARBITRATION: { name: "商事仲裁", code: "CA", color: "#F472B6" },
+  NON_LITIGATION:         { name: "非诉",     code: "NL", color: "#4FD1C5" },
+  LEGAL_COUNSEL:          { name: "顾问",     code: "GC", color: "#9B7BF7" },
+  CRIMINAL:               { name: "刑事",     code: "CR", color: "#FB923C" },
+  ADMINISTRATIVE:         { name: "行政",     code: "AD", color: "#FBBF24" },
+  SPECIAL_PROJECT:        { name: "专项",     code: "SP", color: "#60A5FA" },
+  AGENT_FILING:           { name: "代立案",   code: "AF", color: "#E879F9" },
+  CONSULTATION:           { name: "咨询",     code: "CT", color: "#22D3EE" },
+  PUBLIC_SOURCE:          { name: "公共案源", code: "PS", color: "#FB923C" }
 };
 
 export async function getDashboardCategoryDistribution() {
@@ -187,7 +199,7 @@ export async function getDashboardCategoryDistribution() {
   const groups = await prisma.matter.groupBy({
     by: ["category"],
     where: {
-      status: "IN_PROGRESS",
+      status: { notIn: ["ARCHIVED", "CLOSED", "PENDING_ARCHIVE"] },
       deletedAt: null,
       ...visFilter
     },
@@ -195,7 +207,8 @@ export async function getDashboardCategoryDistribution() {
   });
 
   const result = groups.map((g) => {
-    const meta = CATEGORY_META[g.category] ?? { name: g.category, code: "??", color: "#999" };
+    const cat = g.category ?? "OTHER";
+    const meta = CATEGORY_META[cat] ?? { name: cat, code: cat, color: "#999" };
     return {
       name: meta.name,
       value: g._count.category,
@@ -240,7 +253,7 @@ export async function getDashboardSchedule(): Promise<ScheduleItem[]> {
     }
   };
 
-  const [hearings, deadlines] = await Promise.all([
+  const [hearings, deadlines, tasks] = await Promise.all([
     prisma.hearing.findMany({
       where: { startsAt: { gte: from, lte: to }, procedure: procWhere },
       include: { procedure: { select: procSelect } },
@@ -252,6 +265,39 @@ export async function getDashboardSchedule(): Promise<ScheduleItem[]> {
       include: { procedure: { select: procSelect } },
       orderBy: { dueAt: "asc" },
       take: 12
+    }),
+    prisma.task.findMany({
+      where: {
+        dueAt: { gte: from, lte: to },
+        completed: false,
+        OR: [
+          { matterId: null },
+          { matter: { deletedAt: null, ...visFilter } }
+        ]
+      },
+      select: {
+        id: true,
+        title: true,
+        dueAt: true,
+        matterId: true,
+        description: true,
+        priority: true,
+        matter: {
+          select: {
+            id: true,
+            title: true,
+            internalCode: true,
+            primaryClient: { select: { name: true } },
+            clientLinks: {
+              select: {
+                isPrimary: true,
+                client: { select: { name: true } }
+              },
+              orderBy: [{ isPrimary: "desc" as const }, { addedAt: "asc" as const }]
+            }
+          }
+        }
+      }
     })
   ]);
 
@@ -260,7 +306,7 @@ export async function getDashboardSchedule(): Promise<ScheduleItem[]> {
   const DAY = 1000 * 60 * 60 * 24;
   const daysFrom = (d: Date) => Math.ceil((d.getTime() - now.getTime()) / DAY);
   const fmt = (d: Date) => ({
-    date: `${d.getMonth() + 1}月${d.getDate()}日`,
+    date: `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`,
     weekday: weekdays[d.getDay()],
     time: d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })
   });
@@ -311,6 +357,25 @@ export async function getDashboardSchedule(): Promise<ScheduleItem[]> {
     });
   }
 
+  for (const t of tasks) {
+    if (!t.dueAt) continue;
+    const d = new Date(t.dueAt);
+    const matter = t.matter;
+    itemsWithSort.push({
+      ts: d.getTime(),
+      item: {
+        id: `t-${t.id}`,
+        ...fmt(d),
+        type: "task",
+        title: t.title,
+        matter: matter?.title ?? "（未关联案件）",
+        clientName: matter ? clientNameOf(matter) : null,
+        matterId: matter?.id ?? null,
+        daysUntil: daysFrom(d)
+      }
+    });
+  }
+
   itemsWithSort.sort((a, b) => a.ts - b.ts);
 
   return itemsWithSort.map((i) => i.item).slice(0, 12);
@@ -327,10 +392,16 @@ export async function getDashboardHeroData(): Promise<HeroData> {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
-  const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
   const in7d = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  const [todayDeadlines, weekHearings, nearTermDeadlines, urgentDeadline] = await Promise.all([
+  const in7dEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+  // 本周一～周日
+  const dayOfWeek = now.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(todayStart.getTime() + mondayOffset * 24 * 60 * 60 * 1000);
+  const sunday = new Date(monday.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  const [todayDeadlines, todayTasks, weekHearings, next7dHearings, nearTermDeadlines, urgentDeadline] = await Promise.all([
     // Today's deadlines
     prisma.deadline.count({
       where: {
@@ -342,10 +413,31 @@ export async function getDashboardHeroData(): Promise<HeroData> {
         }
       }
     }),
-    // This week's hearings
+    // Today's tasks
+    prisma.task.count({
+      where: {
+        dueAt: { gte: todayStart, lt: todayEnd },
+        completed: false,
+        OR: [
+          { matterId: null },
+          { matter: { deletedAt: null, ...visFilter } }
+        ]
+      }
+    }),
+    // 本周（周一～周日）开庭
     prisma.hearing.count({
       where: {
-        startsAt: { gte: todayStart, lt: weekEnd },
+        startsAt: { gte: monday, lt: sunday },
+        procedure: {
+          engagement: "ENGAGED",
+          matter: { deletedAt: null, ...visFilter }
+        }
+      }
+    }),
+    // 7日内将开庭（未来）
+    prisma.hearing.count({
+      where: {
+        startsAt: { gte: now, lt: in7dEnd },
         procedure: {
           engagement: "ENGAGED",
           matter: { deletedAt: null, ...visFilter }
@@ -399,8 +491,9 @@ export async function getDashboardHeroData(): Promise<HeroData> {
   }
 
   return {
-    todayDeadlineCount: todayDeadlines,
+    todayDeadlineCount: todayDeadlines + todayTasks,
     weekHearingCount: weekHearings,
+    next7dHearingCount: next7dHearings,
     nearTermCount: nearTermDeadlines,
     focus
   };

@@ -136,6 +136,9 @@ export function ClientCombobox({
       <PopoverContent
         className="w-[--radix-popover-trigger-width] p-0"
         align="start"
+        sideOffset={4}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
       >
         <Command shouldFilter={false}>
           <CommandInput

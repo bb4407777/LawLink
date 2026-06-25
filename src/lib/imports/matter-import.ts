@@ -105,11 +105,11 @@ export function parseAmount(text: string | undefined): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-/** 案件标题：`客户 与 相对方 案由`（无重复空格） */
+/** 案件标题：`客户vs相对方案由`（无重复空格，自动去掉尾部"纠纷"） */
 export function buildMatterTitle(clientName: string, opposingName: string, cause: string | null): string {
-  const base = `${clientName.trim()} 与 ${opposingName.trim()}`;
-  const c = (cause ?? "").trim();
-  return c ? `${base} ${c}` : base;
+  const base = `${clientName.trim()}vs${opposingName.trim()}`;
+  const c = (cause ?? "").trim().replace(/纠纷$/, "");
+  return c ? `${base}${c}` : base;
 }
 
 /** 首程序类型：与收案转化（convertIntakeToMatter）一致的推断 */

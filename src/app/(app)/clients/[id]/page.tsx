@@ -37,10 +37,11 @@ const COOP_TONE: Record<string, string> = {
   TERMINATED: "bg-muted text-muted-foreground"
 };
 
-export default async function ClientDetailPage({ params }: { params: { id: string } }) {
-  const client = await getClientById(params.id);
+export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const client = await getClientById(id);
   if (!client) notFound();
-  const finance = await getClientFinanceSummary(params.id);
+  const finance = await getClientFinanceSummary(id);
 
   const isIndividual = client.type === "INDIVIDUAL";
   const TypeIcon = isIndividual ? User : client.type === "COMPANY" ? Building2 : Briefcase;

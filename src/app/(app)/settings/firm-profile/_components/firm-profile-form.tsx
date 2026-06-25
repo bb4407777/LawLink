@@ -162,97 +162,31 @@ export function FirmProfileForm({ initial }: { initial: Initial }) {
         </div>
       </section>
 
-      {/* —— 内部编号前缀 —— */}
+      {/* —— 系统编号（与律所案号一致） —— */}
       <section className="ll-surface rounded-lg border border-border p-5">
         <header className="mb-3 flex items-center gap-2">
           <Hash className="h-4 w-4 text-primary" />
-          <h2 className="text-lg">系统内部编号</h2>
+          <h2 className="text-lg">系统编号</h2>
         </header>
-        <p className="mb-4 text-[12px] text-muted-foreground">
-          每个案件自动生成的系统编号前缀。格式固定为
-          <span className="mx-1 font-mono">前缀-年份-类别-流水</span>，仅前缀可改。
+        <p className="text-[12px] text-muted-foreground">
+          系统内部编号与律所案号格式一致，在下方「所内案号」配置。
         </p>
-        <div className="flex items-end gap-4">
-          <div className="w-40">
-            <Label className="text-[11px]">编号前缀</Label>
-            <Input
-              value={prefix}
-              onChange={(e) => setPrefix(e.target.value)}
-              placeholder="LL"
-              className="mt-1 font-mono"
-            />
-          </div>
-          <div className="pb-2 text-[12px] text-muted-foreground">
-            示例：
-            <span className="ml-1 font-mono text-foreground/85">
-              {(prefix.trim() || "LL")}-{year}-CC-0001
-            </span>
-          </div>
-        </div>
       </section>
 
       {/* —— 所内案号 —— */}
       <section className="ll-surface rounded-lg border border-border p-5">
         <header className="mb-3 flex items-center gap-2">
           <Hash className="h-4 w-4 text-primary" />
-          <h2 className="text-lg">所内案号（自定义模板）</h2>
+          <h2 className="text-lg">所内案号</h2>
         </header>
         <p className="mb-4 text-[12px] text-muted-foreground">
-          律所习惯的案号，转化收案时按模板自动生成。可用占位符：
-          <code className="mx-0.5">{"{年}"}</code>
-          <code className="mx-0.5">{"{年2}"}</code>
-          <code className="mx-0.5">{"{所}"}</code>
-          <code className="mx-0.5">{"{类}"}</code>
-          <code className="mx-0.5">{"{类词}"}</code>
-          <code className="mx-0.5">{"{序3}"}</code>
-          <code className="mx-0.5">{"{序4}"}</code>
-          （流水按「年+类别」独立计数）。
+          芙蓉所案号规则：格式 <code className="mx-0.5">{"{年2}{类}{序4}"}</code>，
+          各类别共享/独立月计数器（MMNN）。
         </p>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div>
-            <Label className="text-[11px]">所简称（{"{所}"}）</Label>
-            <Input
-              value={shortName}
-              onChange={(e) => setShortName(e.target.value)}
-              placeholder="如：普"
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <Label className="text-[11px]">案号模板</Label>
-            <Input
-              value={template}
-              onChange={(e) => setTemplate(e.target.value)}
-              placeholder="{年}-{所}{类词}-{序3}"
-              className="mt-1 font-mono"
-            />
-          </div>
-        </div>
-
-        <div className="mt-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-[12px]">
-          示例（{sample?.label ?? "民商诉讼"}）：
-          <span className="ml-1 font-mono text-foreground/90">{caseNoPreview || "—"}</span>
-        </div>
-
-        <div className="mt-4">
-          <Label className="text-[11px] text-muted-foreground">类别词（{"{类词}"}）映射</Label>
-          <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
-            {initial.categories.map((c) => (
-              <div key={c.key} className="rounded-md border border-border bg-card p-2">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-[11px] text-muted-foreground">{c.label}</span>
-                  <span className="font-mono text-[10px] text-muted-foreground/70">{c.abbr}</span>
-                </div>
-                <Input
-                  value={words[c.key] ?? ""}
-                  onChange={(e) => setWords((w) => ({ ...w, [c.key]: e.target.value }))}
-                  placeholder={c.word}
-                  className="h-8 text-[12px]"
-                />
-              </div>
-            ))}
-          </div>
+        <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-[12px]">
+          示例：<span className="ml-1 font-mono text-foreground/90">{caseNoPreview || "—"}</span>
+          <span className="ml-2 text-muted-foreground">（民商诉讼，序4=0601 表示6月第1号）</span>
         </div>
       </section>
 

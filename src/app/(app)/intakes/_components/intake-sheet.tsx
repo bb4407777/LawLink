@@ -96,7 +96,10 @@ const CATEGORIES: MatterCategory[] = [
   "ADMINISTRATIVE",
   "NON_LITIGATION",
   "LEGAL_COUNSEL",
-  "SPECIAL_PROJECT"
+  "SPECIAL_PROJECT",
+  "AGENT_FILING",
+  "CONSULTATION",
+  "PUBLIC_SOURCE"
 ];
 
 const FEE_TYPES: FeeType[] = ["FIXED", "CONTINGENCY", "TIMED"];
@@ -345,10 +348,21 @@ export function IntakeSheet({
           await uploadDocument(fd);
         }
       }
+      // 独立律师：创建后自动转化，无需审批
+      let matterId: string | undefined;
+      try {
+        const { convertIntakeToMatter } = await import("@/server/intakes/actions");
+        const matter = await convertIntakeToMatter(res.id);
+        matterId = matter.matterId;
+      } catch {
+        // fallback：转化失败时保持 intake 创建成功
+      }
       toast.success(
-        contracts.length > 0
-          ? `收案已提交审批，上传 ${contracts.length} 份合同`
-          : "收案已提交审批"
+        matterId
+          ? "案件已创建"
+          : contracts.length > 0
+            ? `收案已提交，上传 ${contracts.length} 份合同`
+            : "收案已提交"
       );
       reset({ ...defaults, ownerUserId: session?.user?.id ?? "" });
       setTitleTouched(false);
@@ -719,7 +733,7 @@ export function IntakeSheet({
                 index={idx}
                 fieldPrefix="parties"
                 showStanding={showStanding}
-                removable={!isClient}
+                removable={parties.length > 1}
                 onRemove={() => removeParty(idx)}
                 errors={errors as never}
                 roleSlot={
@@ -813,40 +827,10 @@ export function IntakeSheet({
                 }
                 nameSlot={
                   isClient ? (
-                    <ClientCombobox
-                      triggerClassName="h-9 text-sm"
-                      clientId={clientId}
-                      clientName={watch("parties.0.name") ?? ""}
-                      clientType={
-                        watch("parties.0.partyType") === "ORGANIZATION"
-                          ? "COMPANY"
-                          : "INDIVIDUAL"
-                      }
-                      options={clientOptions}
-                      onPickExisting={(id, name) => {
-                        setValue("clientId", id, { shouldDirty: true });
-                        setValue("parties.0.name", name, {
-                          shouldDirty: true,
-                          shouldValidate: true
-                        });
-                      }}
-                      onTypeNew={(name) => {
-                        setValue("clientId", "", { shouldDirty: true });
-                        setValue("parties.0.name", name, {
-                          shouldDirty: true,
-                          shouldValidate: true
-                        });
-                      }}
-                      onPickYuandian={handlePickYuandian}
-                      onClear={() => {
-                        setValue("clientId", "", { shouldDirty: true });
-                        setValue("parties.0.name", "", { shouldDirty: true });
-                        setValue("parties.0.idNumber", "", { shouldDirty: true });
-                        setValue("parties.0.enterpriseSocialCode", "", { shouldDirty: true });
-                        setValue("parties.0.enterpriseName", "", { shouldDirty: true });
-                        setValue("parties.0.address", "", { shouldDirty: true });
-                        setValue("parties.0.legalRep", "", { shouldDirty: true });
-                      }}
+                    <Input
+                      className="h-9 text-xs"
+                      placeholder={`${clientLabel}名称`}
+                      {...register(`parties.${idx}.name`)}
                     />
                   ) : undefined
                 }
@@ -1220,7 +1204,35 @@ export function IntakeSheet({
             <Section
               title="② 案件当事人"
               required
-              headerAction={addPartyBtn("添加当事人")}
+              headerAction={<div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5"
+                  onClick={() =>
+                    appendParty({
+                      role: "CLIENT_PARTY",
+                      standing: undefined,
+                      ordinal: parties.length + 1,
+                      partyType: "NATURAL_PERSON",
+                      name: "",
+                      idNumber: "",
+                      enterpriseSocialCode: "",
+                      enterpriseName: "",
+                      phone: "",
+                      address: "",
+                      legalRep: "",
+                      contactName: "",
+                      notes: ""
+                    })
+                  }
+                >
+                  <Plus className="h-3 w-3" />
+                  添加委托方
+                </Button>
+                {addPartyBtn("添加当事人")}
+              </div>}
             >
               {watch("ourStanding") && RECEIVING_STANDINGS.has(watch("ourStanding")!) && (
                 <div className="rounded-md border border-dashed border-primary/40 bg-primary/[0.03] p-3">

@@ -11,7 +11,7 @@ export const feeEntryTypeSchema = z.enum([
 export const billingStatusSchema = z.enum(["DRAFT", "ACTIVE", "CLOSED"]);
 
 export const billingCreateSchema = z.object({
-  matterId: z.string().cuid(),
+  matterId: z.string(),
   title: z.string().min(1, "合同名称必填").max(120),
   contractAmount: z.coerce.number().nonnegative(),
   schedule: z.string().max(1000).optional().or(z.literal("")),
@@ -20,8 +20,8 @@ export const billingCreateSchema = z.object({
 });
 
 export const feeEntryCreateSchema = z.object({
-  matterId: z.string().cuid(),
-  billingId: z.string().cuid().optional().or(z.literal("")),
+  matterId: z.string(),
+  billingId: z.string().optional().or(z.literal("")),
   type: feeEntryTypeSchema,
   amount: z.coerce.number(),
   occurredAt: z.coerce.date().default(() => new Date()),
@@ -31,12 +31,25 @@ export const feeEntryCreateSchema = z.object({
   note: z.string().max(500).optional().or(z.literal(""))
 });
 
+export const feeEntryUpdateSchema = z.object({
+  id: z.string(),
+  billingId: z.string().optional().or(z.literal("")),
+  type: feeEntryTypeSchema.optional(),
+  amount: z.coerce.number().optional(),
+  occurredAt: z.coerce.date().optional(),
+  matterId: z.string().optional(),
+  invoiceNo: z.string().max(50).optional().or(z.literal("")),
+  payerOrPayee: z.string().max(80).optional().or(z.literal("")),
+  method: z.string().max(40).optional().or(z.literal("")),
+  note: z.string().max(500).optional().or(z.literal(""))
+});
+
 export const commissionPlanSetSchema = z.object({
-  matterId: z.string().cuid(),
+  matterId: z.string(),
   items: z
     .array(
       z.object({
-        userId: z.string().cuid(),
+        userId: z.string(),
         percent: z.coerce.number().min(0).max(100),
         label: z.string().max(40).optional().or(z.literal(""))
       })
@@ -46,4 +59,5 @@ export const commissionPlanSetSchema = z.object({
 
 export type BillingCreateInput = z.infer<typeof billingCreateSchema>;
 export type FeeEntryCreateInput = z.infer<typeof feeEntryCreateSchema>;
+export type FeeEntryUpdateInput = z.infer<typeof feeEntryUpdateSchema>;
 export type CommissionPlanSetInput = z.infer<typeof commissionPlanSetSchema>;

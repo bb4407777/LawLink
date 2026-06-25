@@ -16,9 +16,11 @@ import {
 import {
   billingCreateSchema,
   feeEntryCreateSchema,
+  feeEntryUpdateSchema,
   commissionPlanSetSchema,
   type BillingCreateInput,
   type FeeEntryCreateInput,
+  type FeeEntryUpdateInput,
   type CommissionPlanSetInput
 } from "./schemas";
 import { notifyRoleApprovers } from "@/server/notifications/approval";
@@ -80,6 +82,120 @@ export async function deleteBilling(id: string) {
     targetId: id
   });
   revalidatePath(`/matters/${billing.matterId}`);
+  return { ok: true };
+}
+
+export async function upsertBillingContractAmount(matterId: string, amount: number) {
+  const session = await requireSession();
+  await assertMatterWritable(matterId, { allowFinanceRole: true });
+
+  const existing = await prisma.billing.findFirst({
+    where: { matterId },
+    orderBy: { createdAt: "desc" }
+  });
+
+  if (existing) {
+    await prisma.billing.update({
+      where: { id: existing.id },
+      data: { contractAmount: new Prisma.Decimal(amount) }
+    });
+  } else {
+    await prisma.billing.create({
+      data: {
+        matterId,
+        title: "委托代理合同",
+        contractAmount: new Prisma.Decimal(amount),
+        status: "ACTIVE"
+      }
+    });
+  }
+
+  await audit({
+    userId: session.user.id,
+    action: existing ? "BILLING_UPDATE" : "BILLING_CREATE",
+    targetType: "Billing",
+    targetId: existing?.id ?? "new",
+    detail: { matterId, contractAmount: amount }
+  });
+
+  revalidatePath(`/matters/${matterId}`);
+  return { ok: true };
+}
+
+export async function upsertFeeEntryByType(
+  matterId: string,
+  type: "RECEIVABLE" | "RECEIVED" | "REFUND" | "COST",
+  amount: number,
+  occurredAt?: Date
+) {
+  const session = await requireSession();
+  await assertMatterWritable(matterId, { allowFinanceRole: true });
+
+  // RECEIVED 支持多笔，每次新建；其他类型每个案件只保留一条
+  if (type === "RECEIVED") {
+    await prisma.feeEntry.create({
+      data: {
+        matterId,
+        type,
+        amount: new Prisma.Decimal(amount),
+        occurredAt: occurredAt ?? new Date(),
+        recordedById: session.user.id
+      }
+    });
+    await audit({
+      userId: session.user.id,
+      action: "FEE_ENTRY_CREATE",
+      targetType: "FeeEntry",
+      targetId: "new",
+      detail: { matterId, type, amount }
+    });
+    revalidatePath(`/matters/${matterId}`);
+    revalidatePath("/finance");
+    return { ok: true };
+  }
+
+  const existing = await prisma.feeEntry.findFirst({
+    where: { matterId, type },
+    orderBy: { createdAt: "desc" }
+  });
+
+  if (existing) {
+    await prisma.feeEntry.update({
+      where: { id: existing.id },
+      data: {
+        amount: new Prisma.Decimal(amount),
+        ...(occurredAt && { occurredAt }),
+        updatedAt: new Date()
+      }
+    });
+    await audit({
+      userId: session.user.id,
+      action: "FEE_ENTRY_UPDATE",
+      targetType: "FeeEntry",
+      targetId: existing.id,
+      detail: { matterId, type, amount }
+    });
+  } else {
+    await prisma.feeEntry.create({
+      data: {
+        matterId,
+        type,
+        amount: new Prisma.Decimal(amount),
+        occurredAt: occurredAt ?? new Date(),
+        recordedById: session.user.id
+      }
+    });
+    await audit({
+      userId: session.user.id,
+      action: "FEE_ENTRY_CREATE",
+      targetType: "FeeEntry",
+      targetId: "new",
+      detail: { matterId, type, amount }
+    });
+  }
+
+  revalidatePath(`/matters/${matterId}`);
+  revalidatePath("/finance");
   return { ok: true };
 }
 
@@ -199,6 +315,49 @@ export async function deleteFeeEntry(id: string) {
   revalidatePath(`/matters/${entry.matterId}`);
   revalidatePath("/finance");
   return { ok: true };
+}
+
+export async function updateFeeEntry(input: FeeEntryUpdateInput) {
+  const session = await requireSession();
+  const data = feeEntryUpdateSchema.parse(input);
+
+  const existing = await prisma.feeEntry.findUnique({
+    where: { id: data.id },
+    select: { matterId: true }
+  });
+  if (!existing) throw new Error("收付记录不存在");
+  const targetMatterId = data.matterId ?? existing.matterId;
+  if (data.matterId && data.matterId !== existing.matterId) {
+    await assertMatterWritable(data.matterId, { allowFinanceRole: true });
+  }
+  await assertMatterWritable(existing.matterId, { allowFinanceRole: true });
+
+  const updated = await prisma.feeEntry.update({
+    where: { id: data.id },
+    data: {
+      ...(data.matterId !== undefined && { matterId: data.matterId }),
+      ...(data.type !== undefined && { type: data.type }),
+      ...(data.amount !== undefined && { amount: new Prisma.Decimal(data.amount) }),
+      ...(data.occurredAt !== undefined && { occurredAt: data.occurredAt }),
+      ...(data.billingId !== undefined && { billingId: data.billingId || null }),
+      ...(data.invoiceNo !== undefined && { invoiceNo: data.invoiceNo || null }),
+      ...(data.payerOrPayee !== undefined && { payerOrPayee: data.payerOrPayee || null }),
+      ...(data.method !== undefined && { method: data.method || null }),
+      ...(data.note !== undefined && { note: data.note || null })
+    }
+  });
+
+  await audit({
+    userId: session.user.id,
+    action: "FEE_ENTRY_UPDATE",
+    targetType: "FeeEntry",
+    targetId: updated.id,
+    detail: { matterId: existing.matterId, changes: data }
+  });
+
+  revalidatePath(`/matters/${existing.matterId}`);
+  revalidatePath("/finance");
+  return { ok: true, id: updated.id };
 }
 
 // ============ CommissionPlan ============
@@ -500,6 +659,20 @@ export async function searchMattersForInvoice(q?: string) {
     select: { id: true, internalCode: true, title: true },
     orderBy: { createdAt: "desc" },
     take: invoiceMatterSearchLimit(q)
+  });
+}
+
+/** 全局收付录入用——搜索可关联案件 */
+export async function searchMattersForFeeEntry(q?: string) {
+  const session = await requireSession();
+  return prisma.matter.findMany({
+    where: {
+      ...invoiceMatterSearchWhere(session.user.id, q),
+      deletedAt: null
+    },
+    select: { id: true, internalCode: true, title: true },
+    orderBy: { createdAt: "desc" },
+    take: 20
   });
 }
 

@@ -24,34 +24,38 @@ async function nextCounter(key: string): Promise<number> {
 }
 
 /**
- * 原子生成 internalCode：{前缀}-{YYYY}-{CODE}-{4位流水}
- *
- * 前缀可在「设置 → 律所信息」配置（默认 LL）。计数器 key 形如 `code-counter-2026-CC`。
+ * 芙蓉所案号规则（所有类型均为 MMNN 月+月内流水）：
+ * - 民/刑/非诉：共享月计数器
+ * - 咨询、代立案等：各自独立月计数器
+ * seq = month * 100 + counter，模板 {序4} 渲染为 MMNN。
  */
 export async function generateInternalCode(category: MatterCategory): Promise<string> {
-  const year = new Date().getFullYear();
-  const code = matterCategoryCode[category];
-  const { matterCodePrefix } = await getFirmProfile();
-
-  const next = await nextCounter(`code-counter-${year}-${code}`);
-  return `${matterCodePrefix}-${year}-${code}-${String(next).padStart(4, "0")}`;
-}
-
-/**
- * v0.42 生成所内案号（项 11）：按「设置 → 律所信息」的模板渲染。
- * 计数器按 年 + 类别 独立自增，key 形如 `firm-caseno-2026-CC`。
- * 模板为空时回退默认；与 internalCode 计数器互不干扰。
- */
-export async function generateFirmCaseNo(category: MatterCategory): Promise<string> {
-  const year = new Date().getFullYear();
-  const code = matterCategoryCode[category];
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
   const profile = await getFirmProfile();
 
-  const seq = await nextCounter(`firm-caseno-${year}-${code}`);
+  // 共享 MMNN 池：民/刑/非/劳仲/商仲 共用"民"字案号
+  const sharedTypes: MatterCategory[] = [
+    "CIVIL_COMMERCIAL", "CRIMINAL", "NON_LITIGATION",
+    "LABOR_ARBITRATION", "COMMERCIAL_ARBITRATION"
+  ];
+  const counterKey = sharedTypes.includes(category)
+    ? `firm-caseno-${year}-${String(month).padStart(2, "0")}`
+    : `firm-caseno-${year}-${String(month).padStart(2, "0")}-${matterCategoryCode[category]}`;
+
+  const counter = await nextCounter(counterKey);
+  const seq = month * 100 + counter;
+
+  // 劳仲/商仲案号也用"民"字
+  const abbr = ["LABOR_ARBITRATION", "COMMERCIAL_ARBITRATION"].includes(category)
+    ? "民"
+    : CATEGORY_ABBR[category];
+
   return renderCaseNoTemplate(profile.caseNoTemplate, {
     year,
     firmShortName: profile.firmShortName,
-    categoryAbbr: CATEGORY_ABBR[category],
+    categoryAbbr: abbr,
     categoryWord: profile.categoryWords[category],
     seq
   });

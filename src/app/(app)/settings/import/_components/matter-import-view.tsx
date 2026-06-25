@@ -194,7 +194,6 @@ export function MatterImportView() {
                     <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-600" />
                     <span className="font-mono text-muted-foreground">第{s.rowNo}行</span>
                     <span className="font-mono">{s.internalCode}</span>
-                    {s.firmCaseNo && <span className="font-mono text-muted-foreground">{s.firmCaseNo}</span>}
                     <span className="truncate">{s.title}</span>
                   </li>
                 ))}

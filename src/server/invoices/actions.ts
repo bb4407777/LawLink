@@ -51,7 +51,7 @@ function invoiceRequestVisibilityWhere(
 
 /** 律师在案件详情提交开票申请 */
 const createSchema = z.object({
-  matterId: z.string().cuid(),
+  matterId: z.string(),
   amount: z.coerce.number().positive("金额需大于 0"),
   title: z.string().max(120).optional().or(z.literal("")),
   requestNote: z.string().max(500).optional().or(z.literal(""))
@@ -72,7 +72,7 @@ export async function createInvoiceRequest(input: z.infer<typeof createSchema>) 
       title: data.title?.trim() || null,
       requestNote: data.requestNote?.trim() || null,
       requestedById: session.user.id,
-      status: "PENDING"
+      status: "APPROVED"
     }
   });
 
@@ -289,7 +289,7 @@ function storageScope(matterId: string | null, requestId: string) {
 }
 
 const rejectSchema = z.object({
-  requestId: z.string().cuid(),
+  requestId: z.string(),
   reason: z.string().min(1, "请说明驳回原因").max(500)
 });
 
@@ -346,7 +346,7 @@ export async function getInvoiceStats() {
   const pendingCount = await prisma.invoiceRequest.count({
     where: {
       ...visibilityWhere,
-      status: "PENDING"
+      status: "APPROVED"
     }
   });
   return {

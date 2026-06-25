@@ -5,18 +5,19 @@ import { listUsers } from "@/server/users/actions";
 import { AuditView } from "./_components/audit-view";
 
 type Props = {
-  searchParams: { action?: string; userId?: string; days?: string };
+  searchParams: Promise<{ action?: string; userId?: string; days?: string }>;
 };
 
 export default async function AuditPage({ searchParams }: Props) {
+  const sp = await searchParams;
   const session = await getSession();
   if (session?.user.role !== "ADMIN") redirect("/settings/profile");
 
   const [{ items, distinctActions }, users] = await Promise.all([
     listAuditLogs({
-      action: searchParams.action,
-      userId: searchParams.userId,
-      days: searchParams.days ? Number(searchParams.days) : 30
+      action: sp.action,
+      userId: sp.userId,
+      days: sp.days ? Number(sp.days) : 30
     }),
     listUsers()
   ]);
@@ -27,9 +28,9 @@ export default async function AuditPage({ searchParams }: Props) {
       distinctActions={distinctActions}
       userOptions={users.map((u) => ({ id: u.id, name: u.name }))}
       initialFilters={{
-        action: searchParams.action ?? "ALL",
-        userId: searchParams.userId ?? "ALL",
-        days: searchParams.days ?? "30"
+        action: sp.action ?? "ALL",
+        userId: sp.userId ?? "ALL",
+        days: sp.days ?? "30"
       }}
     />
   );

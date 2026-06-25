@@ -27,7 +27,7 @@ export const templateListFilterSchema = z.object({
 });
 
 export const templateToggleSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
   enabled: z.boolean()
 });
 
@@ -39,8 +39,8 @@ export const templateToggleSchema = z.object({
  * - overrides: 行内补全的变量（路径化键值，如 {"client.idNumber": "320..."})；行内补全会回写源表
  */
 export const templateRenderSchema = z.object({
-  matterId: z.string().cuid(),
-  templateId: z.string().cuid(),
-  folderId: z.string().cuid().nullable(),
+  matterId: z.string(),
+  templateId: z.string(),
+  folderId: z.string().nullable(),
   overrides: z.record(z.string()).default({})
 });

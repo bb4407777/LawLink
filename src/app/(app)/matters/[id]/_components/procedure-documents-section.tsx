@@ -50,6 +50,7 @@ const categoryLabel: Record<DocumentCategory, string> = {
   PROCEDURE: "程序文件",
   JUDGMENT: "裁决",
   CONTRACT: "其他",
+  ID_CARD: "主体资料",
   OTHER: "其他"
 };
 const CATEGORY_OPTIONS: DocumentCategory[] = [
@@ -57,6 +58,8 @@ const CATEGORY_OPTIONS: DocumentCategory[] = [
   "EVIDENCE",
   "PROCEDURE",
   "JUDGMENT",
+  "CONTRACT",
+  "ID_CARD",
   "OTHER"
 ];
 // 需要标注来源方的类别（诉辩 / 证据）
@@ -143,13 +146,13 @@ function iconFor(d: Pick<DocItem, "mimeType" | "name">) {
   return { src: "/file-icons/generic.svg", alt: "文件" };
 }
 
-// 预览 URL：office 文档走转 HTML，其余走 inline
+// 预览 URL：Office 文档走 PDF 转换（LibreOffice），其余走 inline
 function previewUrl(d: DocItem): string | null {
   if (officePreviewKind(d.mimeType, d.name)) {
-    return `/api/documents/${d.id}/preview`;
+    return `/api/doc-preview-pdf?id=${d.id}`;
   }
   if (canPreview(d.mimeType, d.name)) {
-    return `/api/documents/${d.id}/download?inline=1`;
+    return `/api/doc-preview?id=${d.id}`;
   }
   return null;
 }

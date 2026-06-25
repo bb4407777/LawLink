@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Plus, Search, Users, X } from "lucide-react";
 import type { Client, ClientType, Contact } from "@prisma/client";
 import { Button } from "@/components/ui/button";
+import { PaginationBar } from "@/components/ui/pagination-bar";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -40,17 +41,20 @@ export function ClientsView({ initialData, initialFilters }: Props) {
   const [, startTransition] = useTransition();
   const [search, setSearch] = useState(initialFilters.search);
   const [type, setType] = useState<ClientType | "ALL">(initialFilters.type);
+  const [page, setPage] = useState(initialData.page);
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientRow | null>(null);
 
   const updateUrl = useCallback(
-    (next: { search?: string; type?: string }) => {
+    (next: { search?: string; type?: string; page?: number }) => {
       const params = new URLSearchParams();
       const s = next.search ?? search;
       const t = next.type ?? type;
+      const p = next.page;
       if (s) params.set("search", s);
       if (t && t !== "ALL") params.set("type", t);
+      if (p && p > 1) params.set("page", String(p));
       startTransition(() => {
         router.replace(`/clients${params.toString() ? `?${params.toString()}` : ""}`);
       });
@@ -66,6 +70,7 @@ export function ClientsView({ initialData, initialFilters }: Props) {
   function clearFilters() {
     setSearch("");
     setType("ALL");
+    setPage(1);
     startTransition(() => router.replace("/clients"));
   }
 
@@ -148,6 +153,16 @@ export function ClientsView({ initialData, initialFilters }: Props) {
 
       {/* 列表 */}
       <ClientsTable items={initialData.items} onEdit={handleEdit} />
+
+      <PaginationBar
+        page={page}
+        pageSize={initialData.pageSize}
+        total={initialData.total}
+        onPageChange={(next) => {
+          setPage(next);
+          updateUrl({ page: next });
+        }}
+      />
 
       {/* 抽屉 */}
       <ClientSheet

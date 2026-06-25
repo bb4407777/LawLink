@@ -240,7 +240,7 @@ export async function getSealStats() {
     prisma.sealRequest.count({ where: monthStampedScope }),
     approvableTypes.length > 0
       ? prisma.sealRequest.count({
-          where: { status: "PENDING", sealType: { in: approvableTypes } }
+          where: { status: "APPROVED", sealType: { in: approvableTypes } }
         })
       : 0,
     prisma.sealRequest.count({ where: { status: "APPROVED" } })
@@ -416,7 +416,7 @@ export async function createSealRequest(formData: FormData) {
         requestNote: (data.requestNote || "").trim() || null,
         draftDocId: draftDoc.id,
         requestedById: session.user.id,
-        status: "PENDING",
+        status: "APPROVED",
         parentSealRequestId: data.parentSealRequestId ?? undefined
       }
     });
@@ -454,7 +454,7 @@ export async function createSealRequest(formData: FormData) {
           requestNote: (data.requestNote || "").trim() || null,
           draftDocId: legalRepDoc.id,
           requestedById: session.user.id,
-          status: "PENDING",
+          status: "APPROVED",
           parentSealRequestId: seal.id
         }
       });

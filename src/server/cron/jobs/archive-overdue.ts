@@ -1,8 +1,8 @@
 /**
- * 归档逾期预警：扫描已结案但超过 30 天未提交归档的案件，给主办律师发通知。
+ * 归档逾期预警：扫描待归档但超过 30 天未提交归档的案件，给主办律师发通知。
  *
  * 业务逻辑：
- * - status = CLOSED 且 closedAt < now - 30 天
+ * - status = PENDING_ARCHIVE 且 updatedAt < now - 30 天
  * - 未生成 ArchiveRecord（或都被 REJECTED）
  * - 同一案件 30 天内不重复发预警（refId 唯一性）
  */
@@ -24,8 +24,8 @@ export async function scanArchiveOverdue(): Promise<OverdueScanResult> {
 
   const candidates = await prisma.matter.findMany({
     where: {
-      status: "CLOSED",
-      closedAt: { lt: cutoff },
+      status: "PENDING_ARCHIVE",
+      updatedAt: { lt: cutoff },
       deletedAt: null
     },
     select: {
@@ -33,7 +33,7 @@ export async function scanArchiveOverdue(): Promise<OverdueScanResult> {
       title: true,
       internalCode: true,
       ownerId: true,
-      closedAt: true,
+      updatedAt: true,
       archiveRecords: {
         where: { status: { in: ["PENDING_REVIEW", "APPROVED"] } },
         select: { id: true },
@@ -61,18 +61,18 @@ export async function scanArchiveOverdue(): Promise<OverdueScanResult> {
   let notified = 0;
   let suppressed = 0;
   for (const m of target) {
-    if (!m.id || !m.ownerId || !m.closedAt) continue;
+    if (!m.id || !m.ownerId || !m.updatedAt) continue;
     if (suppressedIds.has(m.id)) {
       suppressed++;
       continue;
     }
-    const days = Math.floor((Date.now() - m.closedAt.getTime()) / 86400_000);
+    const days = Math.floor((Date.now() - m.updatedAt.getTime()) / 86400_000);
     await createNotification({
       userId: m.ownerId,
       type: "SYSTEM",
       priority: "HIGH",
       title: `归档逾期：${m.internalCode}·${m.title}`,
-      content: `案件已结 ${days} 天但未提交归档，请尽快补全材料后提交归档申请。`,
+      content: `案件待归档已 ${days} 天但未提交归档，请尽快补全材料后提交归档申请。`,
       href: `/matters/${m.id}`,
       refType: "ArchiveOverdue",
       refId: m.id

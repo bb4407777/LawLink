@@ -59,7 +59,6 @@ interface PendingRecord {
     id: string;
     title: string;
     internalCode: string;
-    firmCaseNo: string | null;
     category: string;
     primaryClient: { name: string } | null;
   };
@@ -168,7 +167,7 @@ export function PendingArchiveTable({ records }: { records: PendingRecord[] }) {
                   />
                 </td>
                 <td className="px-3 py-2.5 font-mono text-xs text-[#9B7BF7]">
-                  {rec.matter.firmCaseNo ?? "—"}
+                  {rec.matter.internalCode}
                 </td>
                 <td className="px-3 py-2.5">
                   <Link

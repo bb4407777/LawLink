@@ -13,7 +13,7 @@ const guaranteeTypes = ["CASH_DEPOSIT", "GUARANTEE_LETTER", "PROPERTY", "NONE"] 
 const presStatuses = ["ACTIVE", "RENEWED", "EXPIRED", "LIFTED"] as const;
 
 export const preservationCreateSchema = z.object({
-  matterId: z.string().cuid().optional().nullable(),
+  matterId: z.string().optional().nullable(),
   type: z.enum(presTypes),
   propertyType: z.enum(propertyTypes),
   amount: z.coerce.number().nonnegative().optional().nullable(),
@@ -30,30 +30,30 @@ export const preservationCreateSchema = z.object({
   propertyDetail: z.string().max(500).optional().or(z.literal("")),
   note: z.string().max(500).optional().or(z.literal("")),
 
-  ownerId: z.string().cuid().optional().nullable(),
+  ownerId: z.string().optional().nullable(),
   remindDays: z.array(z.coerce.number().int().positive()).default([30, 15, 7, 3, 1])
 });
 
 export const preservationUpdateSchema = preservationCreateSchema.partial().extend({
-  id: z.string().cuid()
+  id: z.string()
 });
 
 export const preservationListFilterSchema = z.object({
   status: z.enum([...presStatuses, "ALL"]).default("ALL"),
-  matterId: z.string().cuid().optional(),
+  matterId: z.string().optional(),
   search: z.string().max(80).optional().or(z.literal(""))
 });
 
 export const preservationRenewSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
   newExpiryDate: z.coerce.date(),
   renewalDuration: z.coerce.number().int().positive(),
   note: z.string().max(300).optional().or(z.literal(""))
 });
 
 export const preservationLiftSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
   note: z.string().max(300).optional().or(z.literal(""))
 });
 
-export const preservationIdSchema = z.object({ id: z.string().cuid() });
+export const preservationIdSchema = z.object({ id: z.string() });

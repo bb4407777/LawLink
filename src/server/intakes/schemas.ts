@@ -28,6 +28,7 @@ export const litigationStandingSchema = z.enum([
   "ENFORCEMENT_APPLICANT",
   "EXECUTED_PERSON",
   "CRIMINAL_DEFENDANT",
+  "CRIMINAL_DEFENDANT_FAMILY",
   "CRIMINAL_VICTIM",
   "PRIVATE_PROSECUTOR",
   "CRIMINAL_INCIDENTAL_PLAINTIFF",
@@ -56,7 +57,7 @@ const intakeCreateBaseSchema = z.object({
     z.string().max(200).optional().or(z.literal(""))
   ),
   category: matterCategorySchema,
-  causeId: z.string().cuid().optional().or(z.literal("")),
+  causeId: z.string().optional().or(z.literal("")),
   causeFreeText: z.string().max(200).optional().or(z.literal("")),
   description: z.string().max(2000).optional().or(z.literal("")),
   receivedAt: z.coerce.date().optional(),
@@ -82,7 +83,7 @@ const intakeCreateBaseSchema = z.object({
   serviceEnd: z.coerce.date().optional(),
 
   // 委托方 + 联系人
-  clientId: z.string().cuid().optional().or(z.literal("")),
+  clientId: z.string().optional().or(z.literal("")),
   clientName: z.string().max(120).optional().or(z.literal("")),
   clientType: clientTypeSchema.optional(),
   contactName: z.string().max(40).optional().or(z.literal("")),
@@ -101,8 +102,8 @@ const intakeCreateBaseSchema = z.object({
   feeNote: z.string().max(500).optional().or(z.literal("")),
 
   // 团队
-  ownerUserId: z.string().cuid().optional().or(z.literal("")),
-  coUserIds: z.array(z.string().cuid()).default([]),
+  ownerUserId: z.string().optional().or(z.literal("")),
+  coUserIds: z.array(z.string()).default([]),
 
   // 对方 / 第三人（其中可能有 standing）
   parties: z.array(partyInputSchema).default([])
@@ -136,7 +137,7 @@ function requireLitigationStandings(
 export const intakeCreateSchema = intakeCreateBaseSchema.superRefine(requireLitigationStandings);
 
 export const intakeUpdateSchema = intakeCreateBaseSchema.extend({
-  id: z.string().cuid()
+  id: z.string()
 }).superRefine(requireLitigationStandings);
 
 export const intakeListQuerySchema = z.object({
@@ -153,7 +154,7 @@ export const intakeListQuerySchema = z.object({
 });
 
 export const declineIntakeSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
   reason: z.string().min(1, "请填写不接案原因").max(500)
 });
 

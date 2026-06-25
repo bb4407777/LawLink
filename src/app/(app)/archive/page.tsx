@@ -22,12 +22,13 @@ const CATEGORY_CN: Record<string, string> = {
 export default async function ArchivePage({
   searchParams
 }: {
-  searchParams?: { tab?: string };
+  searchParams?: Promise<{ tab?: string }>;
 }) {
+  const sp = await searchParams;
   const session = await requireSession();
   const isAdmin = session.user.role === "ADMIN";
   const activeTab =
-    isAdmin && searchParams?.tab === "pending" ? "pending" : "approved";
+    isAdmin && sp?.tab === "pending" ? "pending" : "approved";
 
   const [items, pending] = await Promise.all([
     listArchivedMatters(),
@@ -86,7 +87,7 @@ export default async function ArchivePage({
               {items.map((rec) => (
                 <tr key={rec.id} className="hover:bg-muted/20 transition-colors">
                   <td className="px-3 py-2.5 font-mono text-xs text-[#9B7BF7]">
-                    {rec.matter.firmCaseNo ?? "—"}
+                    {rec.matter.internalCode ?? "—"}
                   </td>
                   <td className="px-3 py-2.5">
                     <Link

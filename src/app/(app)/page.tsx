@@ -31,6 +31,7 @@ export default async function DashboardPage() {
         summary={{
           todayDeadlineCount: hero.todayDeadlineCount,
           weekHearingCount: hero.weekHearingCount,
+          next7dHearingCount: hero.next7dHearingCount,
           nearTermCount: hero.nearTermCount
         }}
         scheduleItems={scheduleItems}
@@ -41,11 +42,11 @@ export default async function DashboardPage() {
       <KpiCards data={kpis} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        <div className="lg:col-span-3">
-          <RevenueChart data={revenueTrend} />
-        </div>
         <div className="lg:col-span-2">
           <CategoryChart data={categoryDistribution} />
+        </div>
+        <div className="lg:col-span-3">
+          <RevenueChart data={revenueTrend} />
         </div>
       </div>
     </div>

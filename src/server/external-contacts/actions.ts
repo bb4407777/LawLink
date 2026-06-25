@@ -43,11 +43,11 @@ const externalContactSchema = z.object({
 });
 
 const externalContactUpdateSchema = externalContactSchema.extend({
-  id: z.string().cuid()
+  id: z.string()
 });
 
 const externalContactReviewSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
   note: z.string().max(500).optional().or(z.literal(""))
 });
 

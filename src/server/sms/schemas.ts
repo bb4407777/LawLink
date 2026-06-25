@@ -25,13 +25,13 @@ export const smsListFilterSchema = z.object({
 });
 
 export const smsMatchToMatterSchema = z.object({
-  smsId: z.string().cuid(),
-  matterId: z.string().cuid().nullable()
+  smsId: z.string(),
+  matterId: z.string().nullable()
 });
 
 export const smsGenerateHearingSchema = z.object({
-  smsId: z.string().cuid(),
-  procedureId: z.string().cuid(),
+  smsId: z.string(),
+  procedureId: z.string(),
   title: z.string().min(1).max(100),
   startsAt: z.coerce.date(),
   room: z.string().max(80).optional().or(z.literal("")),
@@ -40,8 +40,8 @@ export const smsGenerateHearingSchema = z.object({
 });
 
 export const smsGenerateDeadlineSchema = z.object({
-  smsId: z.string().cuid(),
-  procedureId: z.string().cuid(),
+  smsId: z.string(),
+  procedureId: z.string(),
   title: z.string().min(1).max(100),
   category: z
     .enum([
@@ -60,4 +60,4 @@ export const smsGenerateDeadlineSchema = z.object({
   remindDays: z.coerce.number().int().positive().default(3)
 });
 
-export const smsIdSchema = z.object({ id: z.string().cuid() });
+export const smsIdSchema = z.object({ id: z.string() });

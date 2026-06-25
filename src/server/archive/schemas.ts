@@ -10,7 +10,7 @@ export const archiveClosedReasonSchema = z.enum([
 ]);
 
 export const archiveSubmitSchema = z.object({
-  matterId: z.string().cuid(),
+  matterId: z.string(),
   summary: z.string().min(1, "结案小结必填").max(4000),
   closedReason: archiveClosedReasonSchema,
   completedAt: z.coerce.date(),

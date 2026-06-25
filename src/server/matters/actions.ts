@@ -38,9 +38,10 @@ export async function listMatters(input: Partial<MatterListQuery> = {}) {
 
   const whereParts: Prisma.MatterWhereInput[] = [
     matterVisibilityFilter(session.user.id, session.user.role),
-    { deletedAt: null }
+    query.includeDeleted ? { deletedAt: { not: null } } : { deletedAt: null }
   ];
   if (query.category) whereParts.push({ category: query.category });
+  if (query.categoryIn && query.categoryIn.length > 0) whereParts.push({ category: { in: query.categoryIn } });
   if (query.status) whereParts.push({ status: query.status });
   if (query.statusIn) whereParts.push({ status: { in: query.statusIn } });
   if (query.statusNotIn) whereParts.push({ status: { notIn: query.statusNotIn } });
@@ -115,20 +116,29 @@ export async function listMatters(input: Partial<MatterListQuery> = {}) {
           take: 1,
           select: { id: true }
         },
-        _count: { select: { procedures: true } }
+        _count: { select: { procedures: true } },
+        billings: {
+          select: { contractAmount: true }
+        },
+        feeEntries: {
+          where: { type: "RECEIVED" },
+          select: { amount: true }
+        }
       }
     }),
     prisma.matter.count({ where })
   ]);
 
   const sorted = allItems
-    .map((matter) => ({
+    .map(({ billings, feeEntries, ...matter }) => ({
       ...matter,
       latestHearingAt:
         matter.procedures
           .map((p) => p.hearings[0]?.startsAt ?? null)
           .filter((d): d is Date => !!d)
-          .sort((a, b) => b.getTime() - a.getTime())[0] ?? null
+          .sort((a, b) => b.getTime() - a.getTime())[0] ?? null,
+      contractAmount: billings.reduce((acc, b) => acc + Number(b.contractAmount), 0),
+      receivedAmount: feeEntries.reduce((acc, f) => acc + Number(f.amount), 0)
     }))
     .sort((a, b) => {
       const sortValue = (matter: typeof a) => {
@@ -138,6 +148,9 @@ export async function listMatters(input: Partial<MatterListQuery> = {}) {
             ? null
             : Number(matter.claimAmount);
         }
+        if (query.sortBy === "contractAmount") return matter.contractAmount;
+        if (query.sortBy === "receivedAmount") return matter.receivedAmount;
+        if (query.sortBy === "internalCode") return matter.internalCode;
         return matter.intakeDate;
       };
       const aValue = sortValue(a);
@@ -176,6 +189,7 @@ export async function updateProcedureInfo(input: {
   acceptedAt?: string | null;
   concludedAt?: string | null;
   procedureParties?: { partyId: string; standing: LitigationStanding }[];
+  deletedPartyIds?: string[];
   newProcedureParties?: {
     existingPartyId?: string | null;
     name: string;
@@ -320,6 +334,13 @@ export async function updateProcedureInfo(input: {
         concludedAt: input.concludedAt ? new Date(input.concludedAt) : null
       }
     });
+
+    if (input.deletedPartyIds?.length) {
+      await tx.procedureParty.deleteMany({
+        where: { procedureId: input.procedureId, partyId: { in: input.deletedPartyIds } }
+      });
+      await tx.party.deleteMany({ where: { matterId: proc.matterId, id: { in: input.deletedPartyIds } } });
+    }
 
     if (partyRows || newPartyRows.length > 0) {
       await tx.procedureParty.deleteMany({ where: { procedureId: input.procedureId } });
@@ -544,7 +565,7 @@ export async function getMatterById(id: string) {
   const session = await requireSession();
   await assertCanAccessMatter(session.user.id, session.user.role, id);
   const matter = await prisma.matter.findFirst({
-    where: { id, deletedAt: null },
+    where: { id },
     include: {
       primaryClient: { include: { contacts: { where: { isPrimary: true }, take: 1 } } },
       clientLinks: { include: { client: { select: { id: true, name: true, type: true, idNumber: true } } } },
@@ -580,6 +601,25 @@ export async function getMatterById(id: string) {
   });
 
   if (matter) {
+    // 自动补全程序后缀：如已有（一审）（二审）等则跳过
+    const suffixTypes = ["FIRST_INSTANCE","SECOND_INSTANCE","RETRIAL_REVIEW","RETRIAL","REMAND_FIRST","REMAND_SECOND","PROSECUTORIAL_SUPERVISION","INVESTIGATION","PROSECUTION_REVIEW","DEATH_PENALTY_REVIEW","CRIMINAL_ENFORCEMENT","COMMUTATION_PAROLE_REVIEW"];
+    const labelMap: Record<string,string> = {
+      FIRST_INSTANCE:"一审",SECOND_INSTANCE:"二审",RETRIAL_REVIEW:"再审审查",RETRIAL:"再审",
+      REMAND_FIRST:"重审一审",REMAND_SECOND:"重审二审",PROSECUTORIAL_SUPERVISION:"检察监督",
+      INVESTIGATION:"侦查",PROSECUTION_REVIEW:"审查起诉",DEATH_PENALTY_REVIEW:"死刑复核",
+      CRIMINAL_ENFORCEMENT:"刑事执行",COMMUTATION_PAROLE_REVIEW:"减刑假释"
+    };
+    for (const p of matter.procedures) {
+      const suffix = labelMap[p.type];
+      if (suffix && !matter.title.includes(`（${suffix}）`)) {
+        await prisma.matter.update({
+          where: { id },
+          data: { title: `${matter.title}（${suffix}）`, updatedAt: new Date() }
+        });
+        matter.title = `${matter.title}（${suffix}）`;
+        break;
+      }
+    }
     await audit({
       userId: session.user.id,
       action: "MATTER_VIEW",
@@ -595,14 +635,12 @@ export async function createMatter(input: MatterCreateInput) {
   const data = matterCreateSchema.parse(input);
 
   const internalCode = await generateInternalCode(data.category);
-  const firmCaseNo = await generateFirmCaseNo(data.category);
   const [primaryClientId, ...otherClientIds] = data.clientIds;
 
   const created = await prisma.$transaction(async (tx) => {
     const matter = await tx.matter.create({
       data: {
         internalCode,
-        firmCaseNo,
         title: data.title,
         category: data.category,
         ownerId: session.user.id,
@@ -717,7 +755,7 @@ export async function updateMatterTeam(input: {
 }) {
   const session = await requireSession();
   const matter = await prisma.matter.findUnique({
-    where: { id: input.matterId, deletedAt: null },
+    where: { id: input.matterId },
     select: { id: true, ownerId: true }
   });
   if (!matter) throw new Error("案件不存在");
@@ -788,7 +826,7 @@ export async function updateMatterBasicInfo(input: MatterUpdateBasicInput) {
   const data = matterUpdateBasicSchema.parse(input);
 
   const matter = await prisma.matter.findUnique({
-    where: { id: data.id, deletedAt: null },
+    where: { id: data.id },
     select: { id: true, ownerId: true, title: true }
   });
   if (!matter) throw new Error("案件不存在");
@@ -798,6 +836,10 @@ export async function updateMatterBasicInfo(input: MatterUpdateBasicInput) {
   await prisma.matter.update({
     where: { id: data.id },
     data: {
+      internalCode: data.internalCode,
+      intakeDate: data.intakeDate ?? null,
+      status: data.status,
+      category: data.category,
       title: data.title,
       causeId: data.causeId ? data.causeId : null,
       causeFreeText: data.causeFreeText ? data.causeFreeText : null,

@@ -27,7 +27,7 @@ const defCreateSchema = z.object({
 });
 
 const defUpdateSchema = defCreateSchema.partial().extend({
-  id: z.string().cuid()
+  id: z.string()
 });
 
 async function requireAdmin() {

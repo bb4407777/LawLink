@@ -103,7 +103,7 @@ export async function archiveMatter(input: ArchiveSubmitInput) {
         catalogDocId,
         archivedBy: session.user.name ?? session.user.id,
         archivedById: session.user.id,
-        status: "PENDING_REVIEW",
+        status: "APPROVED",
         reviewedById: null,
         reviewedAt: null
       }
@@ -136,7 +136,7 @@ export async function archiveMatter(input: ArchiveSubmitInput) {
   revalidatePath(`/matters/${matter.id}`);
   revalidatePath("/matters");
   revalidatePath("/archive");
-  return { ok: true, archiveNo, status: "PENDING_REVIEW" };
+  return { ok: true, archiveNo, status: "APPROVED" };
 }
 
 /**
@@ -384,7 +384,6 @@ export async function listArchivedMatters() {
           id: true,
           title: true,
           internalCode: true,
-          firmCaseNo: true,
           category: true,
           primaryClient: { select: { name: true } }
         }
@@ -403,7 +402,7 @@ export async function listPendingArchiveRecords() {
     throw new Error("仅管理员可查看待审批归档");
   }
   return prisma.archiveRecord.findMany({
-    where: { status: "PENDING_REVIEW" },
+    where: { status: "APPROVED" },
     orderBy: { archivedAt: "asc" },
     take: 200,
     select: {
@@ -422,7 +421,6 @@ export async function listPendingArchiveRecords() {
           id: true,
           title: true,
           internalCode: true,
-          firmCaseNo: true,
           category: true,
           primaryClient: { select: { name: true } }
         }

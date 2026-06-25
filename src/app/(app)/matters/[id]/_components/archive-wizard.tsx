@@ -27,6 +27,7 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { archiveMatter, getArchivePrepData } from "@/server/archive/actions";
+import { generateAiArchive } from "@/server/archive/ai-summary";
 import { uploadDocument } from "@/server/documents/actions";
 import { CLOSED_REASON_CN } from "@/server/archive/schemas";
 import type { ArchiveChecklist, ArchiveChecklistItem } from "@/lib/archive/checklists";
@@ -80,6 +81,7 @@ export function ArchiveWizardDialog({ matterId, open, onOpenChange }: Props) {
   const [summaryFromClose, setSummaryFromClose] = useState(false);
   const [forceWithMissing, setForceWithMissing] = useState(false);
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
+  const [aiGenerating, setAiGenerating] = useState(false);
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingItemRef = useRef<ArchiveChecklistItem | null>(null);
@@ -254,14 +256,47 @@ export function ArchiveWizardDialog({ matterId, open, onOpenChange }: Props) {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <div className="flex items-baseline justify-between">
-                    <Label className="text-xs">结案小结 *</Label>
-                    {summaryFromClose && (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-primary">
-                        <Sparkles className="h-3 w-3" />
-                        已引用结案时填写的小结，可直接编辑
-                      </span>
-                    )}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs">结案小结 *</Label>
+                      {summaryFromClose && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-primary">
+                          <Sparkles className="h-3 w-3" />
+                          已引用结案时填写的小结，可直接编辑
+                        </span>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1.5 px-3 text-xs"
+                      disabled={aiGenerating}
+                      onClick={async () => {
+                        setAiGenerating(true);
+                        try {
+                          const result = await generateAiArchive(matterId);
+                          setSummary(result.summary);
+                          setSummaryFromClose(false);
+                          setJudgmentSummary(result.judgmentSummary);
+                          if (result.closedReason && result.closedReason !== "OTHER") {
+                            setClosedReason(result.closedReason as any);
+                          }
+                          toast.success("AI 归档信息已生成");
+                        } catch (err) {
+                          toast.error("生成失败", { description: err instanceof Error ? err.message : "" });
+                        } finally {
+                          setAiGenerating(false);
+                        }
+                      }}
+                    >
+                      {aiGenerating ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3.5 w-3.5" />
+                      )}
+                      一键归档
+                    </Button>
                   </div>
                   <Textarea
                     value={summary}

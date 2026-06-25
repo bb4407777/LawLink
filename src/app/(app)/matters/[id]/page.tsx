@@ -6,20 +6,33 @@ import { getMatterFinance } from "@/server/finance/actions";
 import { listPreservationCases } from "@/server/preservations/actions-v2";
 import { listActiveColleagues } from "@/server/users/actions";
 import { getLatestArchiveRecord } from "@/server/archive/actions";
+import { listNotes } from "@/server/notes/actions";
 import { getMatterReviewSummary } from "@/server/ai/matter-review-summary";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { MatterDetailTabs } from "./_components/matter-detail-tabs";
 import { ReviewSummaryCard } from "./_components/review-summary-card";
 
-export default async function MatterDetailPage({ params }: { params: { id: string } }) {
+export default async function MatterDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const [matter, session] = await Promise.all([
-    getMatterById(params.id),
+    getMatterById(id),
     getSession()
   ]);
   if (!matter) notFound();
 
-  const [finance, userOptions, documents, intakeContracts, folders, templates, preservations, allColleagues, sealContracts, expresses, latestArchive, customFieldDefs] = await Promise.all([
+  // Sanitize Decimal fields for client serialization
+  const sanitizedMatter = JSON.parse(JSON.stringify({
+    ...matter,
+    claimAmount: matter.claimAmount ? Number(matter.claimAmount) : null,
+    procedures: matter.procedures?.map((p: any) => ({
+      ...p,
+      acceptedAt: p.acceptedAt ? new Date(p.acceptedAt).toISOString() : null,
+      concludedAt: p.concludedAt ? new Date(p.concludedAt).toISOString() : null,
+    }))
+  }));
+
+  const [finance, userOptions, documents, intakeContracts, folders, templates, preservations, allColleagues, sealContracts, expresses, latestArchive, customFieldDefs, notes] = await Promise.all([
     getMatterFinance(matter.id),
     prisma.user.findMany({
       where: { active: true },
@@ -113,8 +126,22 @@ export default async function MatterDetailPage({ params }: { params: { id: strin
       where: { entityType: "MATTER", enabled: true },
       orderBy: [{ order: "asc" }, { createdAt: "asc" }],
       select: { id: true, key: true, label: true, fieldType: true, options: true, required: true }
-    })
+    }),
+    listNotes(matter.id)
   ]);
+
+  // Sanitize finance Decimal fields
+  const sanitizedFinance = finance ? {
+    ...finance,
+    entries: finance.entries?.map((e: any) => ({
+      ...e,
+      amount: e.amount ? Number(e.amount) : null,
+    })),
+    billings: finance.billings?.map((b: any) => ({
+      ...b,
+      contractAmount: b.contractAmount ? Number(b.contractAmount) : null,
+    }))
+  } : null;
 
   // v0.22: 本案 AI 审查总览（聚合 ReviewRecord）
   const reviewSummary = await getMatterReviewSummary(matter.id);
@@ -157,8 +184,8 @@ export default async function MatterDetailPage({ params }: { params: { id: strin
       <ReviewSummaryCard summary={reviewSummary} matterId={matter.id} />
 
       <MatterDetailTabs
-        matter={matter}
-        finance={finance}
+        matter={sanitizedMatter}
+        finance={sanitizedFinance}
         userOptions={userOptions}
         documents={documents}
         intakeContracts={intakeContracts}
@@ -178,6 +205,7 @@ export default async function MatterDetailPage({ params }: { params: { id: strin
         expresses={expresses}
         latestArchive={latestArchive}
         customFieldDefs={customFieldDefs}
+        notes={notes}
       />
     </div>
   );

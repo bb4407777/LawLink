@@ -27,7 +27,7 @@ const announcementCreateSchema = z.object({
 });
 
 const announcementUpdateSchema = announcementCreateSchema.extend({
-  id: z.string().cuid()
+  id: z.string()
 });
 
 export async function listAnnouncements({

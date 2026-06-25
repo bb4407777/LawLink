@@ -207,7 +207,7 @@ function ListView({
             >
               <div className="flex items-center gap-3">
                 <span className={cn("text-base font-semibold", isToday && "text-primary")}>
-                  {d.toLocaleDateString("zh-CN", { month: "long", day: "numeric" })}
+                  {d.toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" })}
                 </span>
                 <span className="text-xs text-muted-foreground">
                   {d.toLocaleDateString("zh-CN", { weekday: "long" })}

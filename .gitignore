@@ -50,3 +50,11 @@ tsconfig.tsbuildinfo
 
 # Working scratch (outside of project scope)
 outputs/
+
+# 真实案件文档（不入版本，本地保留）
+public/docs/
+public/new-test.pdf
+public/test-view.pdf
+
+# 杂项（不入版本）
+-

@@ -21,7 +21,10 @@ const CATEGORY_SHORT: Record<MatterCategory, string> = {
   ADMINISTRATIVE: "行",
   NON_LITIGATION: "非",
   LEGAL_COUNSEL: "顾",
-  SPECIAL_PROJECT: "专"
+  SPECIAL_PROJECT: "专",
+  AGENT_FILING: "代",
+  CONSULTATION: "咨",
+  PUBLIC_SOURCE: "公"
 };
 
 export function categoryShort(category: MatterCategory): string {

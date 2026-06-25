@@ -3,9 +3,12 @@
 import { useState, useTransition, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Plus, Search, X, Clock, CheckCircle2, Archive, AlertCircle, FolderOpen, Download } from "lucide-react";
+import { Plus, Search, X, Clock, CheckCircle2, Archive, AlertCircle, FolderOpen, Download, FolderArchive, FileText } from "lucide-react";
 import type { MatterCategory, ClientType, UserRole } from "@prisma/client";
+import type { OverviewStats, CategoryItem, RevenueTrendItem } from "@/server/matters/overview-stats";
+import { MattersStatsOverview } from "./matters-stats-overview";
 import { Button } from "@/components/ui/button";
+import { PaginationBar } from "@/components/ui/pagination-bar";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -23,26 +26,31 @@ import { IntakesTable, type IntakeRow } from "./intakes-table";
 export type ClientOption = { id: string; name: string; type: ClientType };
 export type ColleagueOption = { id: string; name: string; role: UserRole };
 
-type Tab = "intake" | "active" | "archived" | "revision" | "all";
-type SortBy = "hearing" | "intakeDate" | "claimAmount";
+type Tab = "intake" | "revision" | "active" | "filingMaterials" | "filingMaterialsSign" | "onlineFiling" | "onlineFilingReview" | "filingAccepted" | "feePaymentPending" | "feePaid" | "hearingScheduled" | "postHearing" | "postJudgment" | "executionMaterials" | "executionMaterialsSign" | "executionOnlineFiling" | "executionOnlineReview" | "executionPreservation" | "execution" | "detention30" | "arrestReview7" | "postArrestReview" | "custodyNecessity" | "bailPending" | "prosecutionReview" | "trial" | "criminalExecution" | "pendingArchive" | "archived" | "deleted" | "all";
+type SortBy = "hearing" | "intakeDate" | "claimAmount" | "contractAmount" | "receivedAmount" | "internalCode";
 type SortDir = "asc" | "desc";
 
 type Props = {
   tab: Tab;
-  matterData?: { items: MatterRow[]; total: number };
-  intakeData?: { items: IntakeRow[]; total: number };
+  matterData?: { items: MatterRow[]; total: number; page: number; pageSize: number };
+  intakeData?: { items: IntakeRow[]; total: number; page: number; pageSize: number };
   clientOptions: ClientOption[];
   colleagues: ColleagueOption[];
   initialFilters: {
     search: string;
     category: MatterCategory | "ALL";
     status?: string; // all tab 下 status 筛选
+    categoryGroup?: string;
     from?: string; // 收案时间起
     to?: string; // 收案时间止
     sortBy?: SortBy;
     sortDir?: SortDir;
+    page?: number;
   };
   autoOpenIntake?: boolean;
+  overviewStats?: OverviewStats;
+  categoryDistribution?: CategoryItem[];
+  revenueTrend?: RevenueTrendItem[];
 };
 
 const ALL_CATEGORIES: (MatterCategory | "ALL")[] = [
@@ -54,28 +62,82 @@ const ALL_CATEGORIES: (MatterCategory | "ALL")[] = [
   "ADMINISTRATIVE",
   "NON_LITIGATION",
   "LEGAL_COUNSEL",
-  "SPECIAL_PROJECT"
+  "SPECIAL_PROJECT",
+  "AGENT_FILING",
+  "CONSULTATION",
+  "PUBLIC_SOURCE"
 ];
 
-const TABS: { key: Tab; label: string; icon: typeof Clock }[] = [
-  { key: "all", label: "全部案件", icon: FolderOpen },
-  { key: "intake", label: "待审批", icon: Clock },
-  { key: "active", label: "进行中", icon: CheckCircle2 },
-  { key: "revision", label: "待补正", icon: AlertCircle },
-  { key: "archived", label: "已归档", icon: Archive }
+const NO_ICON = (({ className }) => null) as unknown as typeof Clock;
+
+const CIVIL_TABS: { key: Tab; label: string; icon: typeof Clock }[] = [
+  { key: "all", label: "全部案件", icon: NO_ICON },
+  { key: "active", label: "进行中", icon: NO_ICON },
+  { key: "filingMaterials", label: "做立案材料", icon: NO_ICON },
+  { key: "filingMaterialsSign", label: "立案材料待签名", icon: NO_ICON },
+  { key: "onlineFiling", label: "做网上立案", icon: NO_ICON },
+  { key: "onlineFilingReview", label: "网上立案待审核", icon: NO_ICON },
+  { key: "filingAccepted", label: "网上立案通过", icon: NO_ICON },
+  { key: "feePaymentPending", label: "交费单待交费", icon: NO_ICON },
+  { key: "feePaid", label: "交费单交费后", icon: NO_ICON },
+  { key: "hearingScheduled", label: "有开庭时间", icon: NO_ICON },
+  { key: "postHearing", label: "庭后未判决", icon: NO_ICON },
+  { key: "postJudgment", label: "判决后待上诉", icon: NO_ICON },
+  { key: "executionMaterials", label: "做执行资料", icon: NO_ICON },
+  { key: "executionMaterialsSign", label: "执行材料待签名", icon: NO_ICON },
+  { key: "executionOnlineFiling", label: "做执行网上立案", icon: NO_ICON },
+  { key: "executionOnlineReview", label: "执行网上立案待审核", icon: NO_ICON },
+  { key: "executionPreservation", label: "执行保全阶段", icon: NO_ICON },
+  { key: "execution", label: "执行阶段", icon: NO_ICON },
+  { key: "pendingArchive", label: "待归档", icon: NO_ICON },
+  { key: "archived", label: "已归档", icon: NO_ICON },
+  { key: "deleted", label: "已删除", icon: NO_ICON }
 ];
+
+const CRIMINAL_TABS: { key: Tab; label: string; icon: typeof Clock }[] = [
+  { key: "all", label: "全部案件", icon: NO_ICON },
+  { key: "active", label: "进行中", icon: NO_ICON },
+  { key: "detention30", label: "拘留30天", icon: NO_ICON },
+  { key: "arrestReview7", label: "审查逮捕7天", icon: NO_ICON },
+  { key: "postArrestReview", label: "审查逮捕后", icon: NO_ICON },
+  { key: "custodyNecessity", label: "羁押必要性审查10天", icon: NO_ICON },
+  { key: "bailPending", label: "取保候审", icon: NO_ICON },
+  { key: "prosecutionReview", label: "检察院审查起诉", icon: NO_ICON },
+  { key: "trial", label: "一审阶段", icon: NO_ICON },
+  { key: "criminalExecution", label: "二审阶段", icon: NO_ICON },
+  { key: "pendingArchive", label: "待归档", icon: NO_ICON },
+  { key: "archived", label: "已归档", icon: NO_ICON },
+  { key: "deleted", label: "已删除", icon: NO_ICON }
+];
+
+const SIMPLE_TABS: { key: Tab; label: string; icon: typeof Clock }[] = [
+  { key: "all", label: "全部案件", icon: FolderOpen },
+  { key: "active", label: "进行中", icon: CheckCircle2 },
+  { key: "pendingArchive", label: "待归档", icon: FolderArchive },
+  { key: "archived", label: "已归档", icon: Archive },
+  { key: "deleted", label: "已删除", icon: NO_ICON }
+];
+
+function getTabs(categoryGroup?: string) {
+  if (categoryGroup === "civil" || categoryGroup === "agentFiling") return CIVIL_TABS;
+  if (categoryGroup === "criminal" || categoryGroup === "nonLitigation") return CRIMINAL_TABS;
+  return SIMPLE_TABS;
+}
 
 const ALL_STATUS_FILTERS: { value: string; label: string }[] = [
   { value: "ALL", label: "全部状态" },
   { value: "active", label: "办理中" },
-  { value: "closed", label: "已结案" },
+  { value: "pendingArchive", label: "待归档" },
   { value: "archived", label: "已归档" }
 ];
 
 const SORT_OPTIONS: { value: SortBy; label: string }[] = [
   { value: "hearing", label: "按开庭时间" },
   { value: "intakeDate", label: "按收案时间" },
-  { value: "claimAmount", label: "按标的金额" }
+  { value: "claimAmount", label: "按标的金额" },
+  { value: "contractAmount", label: "按合同额" },
+  { value: "receivedAmount", label: "按已收" },
+  { value: "internalCode", label: "按编号" }
 ];
 
 const SORT_DIR_OPTIONS: { value: SortDir; label: string }[] = [
@@ -84,18 +146,14 @@ const SORT_DIR_OPTIONS: { value: SortDir; label: string }[] = [
 ];
 
 function defaultSortByForTab(tab: Tab): SortBy {
-  return tab === "active" ? "hearing" : "intakeDate";
+  return "intakeDate";
 }
 
 function sortOptionsForTab(tab: Tab) {
-  if (tab === "active" || tab === "all") return SORT_OPTIONS;
-  return SORT_OPTIONS.filter((option) => option.value !== "hearing");
+  return SORT_OPTIONS;
 }
 
 function normalizeSortByForTab(tab: Tab, sortBy: SortBy): SortBy {
-  if (sortBy === "hearing" && tab !== "active" && tab !== "all") {
-    return defaultSortByForTab(tab);
-  }
   return sortBy;
 }
 
@@ -106,7 +164,10 @@ export function MattersView({
   clientOptions,
   colleagues,
   initialFilters,
-  autoOpenIntake
+  autoOpenIntake,
+  overviewStats,
+  categoryDistribution,
+  revenueTrend
 }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -117,7 +178,9 @@ export function MattersView({
   const [dateTo, setDateTo] = useState<string>(initialFilters.to ?? "");
   const [sortBy, setSortBy] = useState<SortBy>(initialFilters.sortBy ?? defaultSortByForTab(tab));
   const [sortDir, setSortDir] = useState<SortDir>(initialFilters.sortDir ?? "desc");
+  const [page, setPage] = useState(initialFilters.page ?? 1);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const categoryGroup = initialFilters.categoryGroup;
   const currentDefaultSortBy = defaultSortByForTab(tab);
   const sortOptions = sortOptionsForTab(tab);
 
@@ -129,6 +192,7 @@ export function MattersView({
     setDateTo(initialFilters.to ?? "");
     setSortBy(initialFilters.sortBy ?? defaultSortByForTab(tab));
     setSortDir(initialFilters.sortDir ?? "desc");
+    setPage(initialFilters.page ?? 1);
   }, [
     tab,
     initialFilters.search,
@@ -137,7 +201,8 @@ export function MattersView({
     initialFilters.from,
     initialFilters.to,
     initialFilters.sortBy,
-    initialFilters.sortDir
+    initialFilters.sortDir,
+    initialFilters.page
   ]);
 
   // ?new=1 自动打开
@@ -146,7 +211,7 @@ export function MattersView({
       setSheetOpen(true);
       // 清掉 ?new=1，避免刷新再次弹
       const params = new URLSearchParams();
-      if (tab !== "active") params.set("tab", tab);
+      if (tab !== "all") params.set("tab", tab);
       if (initialFilters.search) params.set("search", initialFilters.search);
       if (initialFilters.category !== "ALL") params.set("category", initialFilters.category);
       if (tab === "all" && initialFilters.status && initialFilters.status !== "ALL") {
@@ -173,6 +238,7 @@ export function MattersView({
       to?: string;
       sortBy?: SortBy;
       sortDir?: SortDir;
+      page?: number;
     }) => {
       const params = new URLSearchParams();
       const t = override.tab ?? tab;
@@ -183,8 +249,10 @@ export function MattersView({
       const to_ = override.to ?? dateTo;
       const sb = normalizeSortByForTab(t, override.sortBy ?? sortBy);
       const sd = override.sortDir ?? sortDir;
+      const p = override.page;
       const defaultSortBy = defaultSortByForTab(t);
-      if (t !== "active") params.set("tab", t);
+      if (t !== "all") params.set("tab", t);
+      if (categoryGroup) params.set("categoryGroup", categoryGroup);
       if (s) params.set("search", s);
       if (c && c !== "ALL") params.set("category", c);
       if (t === "all" && st && st !== "ALL") params.set("status", st);
@@ -192,6 +260,7 @@ export function MattersView({
       if (to_) params.set("to", to_);
       if (sb !== defaultSortBy) params.set("sortBy", sb);
       if (sd !== "desc") params.set("sortDir", sd);
+      if (p && p > 1) params.set("page", String(p));
       return `/matters${params.toString() ? `?${params.toString()}` : ""}`;
     },
     [tab, search, category, statusFilter, dateFrom, dateTo, sortBy, sortDir]
@@ -209,7 +278,8 @@ export function MattersView({
     const nextSortBy = defaultSortByForTab(next);
     setSortBy(nextSortBy);
     setSortDir("desc");
-    startTransition(() => router.replace(buildUrl({ tab: next, sortBy: nextSortBy, sortDir: "desc" })));
+    setPage(1);
+    startTransition(() => router.replace(buildUrl({ tab: next, sortBy: nextSortBy, sortDir: "desc", page: 1 })));
   }
 
   function applyFilters() {
@@ -224,8 +294,9 @@ export function MattersView({
     setDateTo("");
     setSortBy(currentDefaultSortBy);
     setSortDir("desc");
+    setPage(1);
     startTransition(() =>
-      router.replace(`/matters${tab !== "active" ? `?tab=${tab}` : ""}`)
+      router.replace(`/matters${tab !== "all" ? `?tab=${tab}` : ""}`)
     );
   }
 
@@ -253,10 +324,10 @@ export function MattersView({
       <header className="space-y-2">
         <div className="flex items-end justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="text-xl font-medium tracking-tight">案件管理</h1>
+            <h1 className="text-xl font-medium tracking-tight">{categoryGroup === "civil" ? "民事案件管理" : categoryGroup === "criminal" ? "刑事案件管理" : categoryGroup === "nonLitigation" ? "非诉案件管理" : categoryGroup === "agentFiling" ? "代立案管理" : categoryGroup === "consultation" ? "咨询管理" : categoryGroup === "publicSource" ? "公共案源管理" : categoryGroup === "legalCounsel" ? "顾问管理" : categoryGroup === "specialProject" ? "专项管理" : "案件管理"}</h1>
             <p className="text-[13px] text-muted-foreground">
               <span className="text-foreground/80">
-                {TABS.find((t) => t.key === tab)?.label}
+                {getTabs(categoryGroup).find((t) => t.key === tab)?.label}
               </span>
               <span className="mx-2 text-muted-subtle">·</span>
               共 <span className="font-mono tabular text-foreground">{total}</span> 件
@@ -278,11 +349,22 @@ export function MattersView({
         <div className="ll-rule" />
       </header>
 
+      {/* 统计概览（非 intake/revision 标签页显示） */}
+      {overviewStats && categoryDistribution && revenueTrend && (
+        <div className="-mt-1">
+          <MattersStatsOverview
+            stats={overviewStats}
+            categoryDistribution={categoryDistribution}
+            revenueTrend={revenueTrend}
+          />
+        </div>
+      )}
+
       {/* Tab */}
       <div
         className="flex items-end gap-1 border-b border-border"
       >
-        {TABS.map((t) => {
+        {getTabs(categoryGroup).map((t) => {
           const Icon = t.icon;
           const active = t.key === tab;
           return (
@@ -443,9 +525,19 @@ export function MattersView({
       ) : (
         <MattersTable
           items={matterData?.items ?? []}
-          metaColumn={tab === "archived" ? "firmCaseNo" : "hearing"}
+          metaColumn="hearing"
         />
       )}
+
+      <PaginationBar
+        page={page}
+        pageSize={(isIntakeStyle ? intakeData?.pageSize : matterData?.pageSize) ?? 20}
+        total={total}
+        onPageChange={(next) => {
+          setPage(next);
+          startTransition(() => router.replace(buildUrl({ page: next })));
+        }}
+      />
 
       <IntakeSheet
         open={sheetOpen}

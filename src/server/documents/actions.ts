@@ -244,7 +244,7 @@ export async function hardDeleteDocument(id: string) {
 const docListQuerySchema = z.object({
   search: z.string().optional(),
   category: documentCategorySchema.optional(),
-  matterId: z.string().cuid().optional(),
+  matterId: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(500).default(200)
 });
 
@@ -293,7 +293,7 @@ export async function submitDocumentForReview(id: string) {
 
   await prisma.document.update({
     where: { id },
-    data: { status: "PENDING_REVIEW" },
+    data: { status: "APPROVED" },
   });
 
   await audit({

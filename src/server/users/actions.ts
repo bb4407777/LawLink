@@ -24,12 +24,12 @@ const userCreateSchema = z.object({
 });
 
 const userUpdateRoleSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
   role: userRoleSchema
 });
 
 const resetPasswordSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
   newPassword: z.string().min(8).max(128)
 });
 

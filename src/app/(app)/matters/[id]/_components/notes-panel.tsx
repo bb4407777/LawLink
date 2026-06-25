@@ -14,7 +14,8 @@ import {
   Gavel,
   Loader2,
   Trash2,
-  MessageSquare
+  MessageSquare,
+  Pencil
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +36,7 @@ import {
   SheetTitle,
   SheetFooter
 } from "@/components/ui/sheet";
-import { createNote, deleteNote } from "@/server/notes/actions";
+import { createNote, updateNote, deleteNote } from "@/server/notes/actions";
 import type { NotePayload } from "./matter-detail-tabs";
 import { cn } from "@/lib/utils";
 
@@ -49,7 +50,7 @@ const channelMeta = {
 } as const;
 
 const formSchema = z.object({
-  matterId: z.string().cuid(),
+  matterId: z.string(),
   channel: z.enum(["PHONE", "WECHAT", "EMAIL", "MEETING", "COURT", "OTHER"]),
   withWhom: z.string().max(80).optional().or(z.literal("")),
   occurredAt: z.coerce.date(),
@@ -66,10 +67,11 @@ export function NotesPanel({
   notes: NotePayload[];
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<NotePayload | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleDelete(id: string) {
-    if (!confirm("删除这条沟通记录？")) return;
+    if (!confirm("删除这条办案记录？")) return;
     startTransition(async () => {
       try {
         await deleteNote(id);
@@ -80,26 +82,42 @@ export function NotesPanel({
     });
   }
 
+  function handleEdit(n: NotePayload) {
+    setEditingNote(n);
+    setSheetOpen(true);
+  }
+
+  function handleSheetClose(open: boolean) {
+    if (!open) {
+      setEditingNote(null);
+    }
+    setSheetOpen(open);
+  }
+
   return (
     <div className="space-y-4">
       <header className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          按时间倒序展示。每条记录会进入审计日志。
-        </p>
+        <div className="space-y-0.5">
+          <h3 className="text-sm font-medium">办案记录</h3>
+          <p className="text-xs text-muted-foreground">电话 / 微信 / 邮件 / 面谈 / 法院沟通，按时间倒序</p>
+        </div>
         <Button
-          onClick={() => setSheetOpen(true)}
+          onClick={() => {
+            setEditingNote(null);
+            setSheetOpen(true);
+          }}
           size="sm"
           className="gap-1.5 "
         >
           <Plus className="h-4 w-4" />
-          录入沟通
+          录入记录
         </Button>
       </header>
 
       {notes.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card py-16 text-center">
           <p className="text-sm text-muted-foreground">
-            还没有沟通记录。点击 <span className="text-foreground">录入沟通</span> 开始
+            还没有办案记录。点击 <span className="text-foreground">录入记录</span> 开始
           </p>
         </div>
       ) : (
@@ -135,6 +153,7 @@ export function NotesPanel({
                       )}
                       <span className="font-mono text-xs text-muted-foreground tabular">
                         {new Date(n.occurredAt).toLocaleString("zh-CN", {
+                          year: "numeric",
                           month: "2-digit",
                           day: "2-digit",
                           hour: "2-digit",
@@ -157,15 +176,24 @@ export function NotesPanel({
                       </div>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(n.id)}
-                    disabled={isPending}
-                    className="opacity-0 transition-opacity group-hover:opacity-100"
-                    aria-label="删除"
-                  >
-                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-                  </button>
+                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(n)}
+                      disabled={isPending}
+                      aria-label="编辑"
+                    >
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(n.id)}
+                      disabled={isPending}
+                      aria-label="删除"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                    </button>
+                  </div>
                 </div>
               </li>
             );
@@ -173,21 +201,30 @@ export function NotesPanel({
         </ul>
       )}
 
-      <NoteSheet matterId={matterId} open={sheetOpen} onOpenChange={setSheetOpen} />
+      <NoteSheet
+        key={editingNote?.id ?? "new"}
+        matterId={matterId}
+        note={editingNote}
+        open={sheetOpen}
+        onOpenChange={handleSheetClose}
+      />
     </div>
   );
 }
 
 function NoteSheet({
   matterId,
+  note,
   open,
   onOpenChange
 }: {
   matterId: string;
+  note: NotePayload | null;
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
   const [isPending, startTransition] = useTransition();
+  const isEditing = note !== null;
   const {
     register,
     handleSubmit,
@@ -197,13 +234,21 @@ function NoteSheet({
     formState: { errors }
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      matterId,
-      channel: "PHONE",
-      withWhom: "",
-      occurredAt: new Date(),
-      content: ""
-    }
+    defaultValues: isEditing
+      ? {
+          matterId,
+          channel: note.channel,
+          withWhom: note.withWhom ?? "",
+          occurredAt: new Date(note.occurredAt),
+          content: note.content
+        }
+      : {
+          matterId,
+          channel: "PHONE",
+          withWhom: "",
+          occurredAt: new Date(),
+          content: ""
+        }
   });
 
   const channel = watch("channel");
@@ -211,18 +256,17 @@ function NoteSheet({
   function onSubmit(values: FormValues) {
     startTransition(async () => {
       try {
-        await createNote({ ...values, tags: [] });
-        toast.success("沟通记录已保存");
-        reset({
-          matterId,
-          channel: "PHONE",
-          withWhom: "",
-          occurredAt: new Date(),
-          content: ""
-        });
+        if (isEditing) {
+          await updateNote({ ...values, id: note.id, tags: note.tags ?? [] });
+          toast.success("办案记录已更新");
+        } else {
+          await createNote({ ...values, tags: [] });
+          toast.success("办案记录已保存");
+        }
+        reset();
         onOpenChange(false);
       } catch (err) {
-        toast.error("保存失败", { description: err instanceof Error ? err.message : "" });
+        toast.error(isEditing ? "更新失败" : "保存失败", { description: err instanceof Error ? err.message : "" });
       }
     });
   }
@@ -231,13 +275,13 @@ function NoteSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex w-full max-w-md flex-col gap-0 p-0">
         <SheetHeader className="border-b border-border bg-background px-6 py-4">
-          <SheetTitle>录入沟通</SheetTitle>
+          <SheetTitle>{isEditing ? "编辑记录" : "录入记录"}</SheetTitle>
         </SheetHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 flex-col">
           <div className="flex-1 space-y-3 overflow-y-auto px-6 py-5">
             <div className="space-y-2">
-              <Label className="text-xs">沟通渠道</Label>
+              <Label className="text-xs">记录渠道</Label>
               <div className="grid grid-cols-3 gap-1.5">
                 {(["PHONE", "WECHAT", "EMAIL", "MEETING", "COURT", "OTHER"] as const).map(
                   (c) => {
@@ -265,7 +309,7 @@ function NoteSheet({
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs">沟通对象</Label>
+              <Label className="text-xs">记录对象</Label>
               <Input placeholder="如 张三 / 主审法官" {...register("withWhom")} />
             </div>
 
@@ -283,7 +327,7 @@ function NoteSheet({
               </Label>
               <Textarea
                 rows={8}
-                placeholder="简要记录沟通内容、对方意见、约定事项等"
+                placeholder="简要记录办案内容、对方意见、约定事项等"
                 {...register("content")}
               />
               {errors.content && (
@@ -303,7 +347,7 @@ function NoteSheet({
             </Button>
             <Button type="submit" disabled={isPending} className="gap-1.5">
               {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              保存
+              {isEditing ? "更新" : "保存"}
             </Button>
           </SheetFooter>
         </form>

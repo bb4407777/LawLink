@@ -11,17 +11,18 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
-  // ?inline=1 时以 inline 方式返回，浏览器新标签内预览（PDF/图片/文本），否则下载
-  const inline = new URL(req.url).searchParams.get("inline") === "1";
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
-  }
+  try {
+    // ?inline=1 时以 inline 方式返回，浏览器新标签内预览（PDF/图片/文本），否则下载
+    const inline = new URL(req.url).searchParams.get("inline") === "1";
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: "未登录" }, { status: 401 });
+    }
 
-  const doc = await prisma.document.findFirst({
-    where: { id: params.id, deletedAt: null }
-  });
-  if (!doc) return NextResponse.json({ error: "材料不存在" }, { status: 404 });
+    const doc = await prisma.document.findFirst({
+      where: { id: params.id, deletedAt: null }
+    });
+    if (!doc) return NextResponse.json({ error: "材料不存在" }, { status: 404 });
 
   // 权限检查：ADMIN / PRINCIPAL_LAWYER 可读全部；其他角色 —— 案件成员才能读案件材料；
   // 仅 intakeId 的收案合同限收案创建人/主办/协办（含客户身份证号等隐私，不再对全所开放）
@@ -82,7 +83,11 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     headers: {
       "Content-Type": doc.mimeType ?? "application/octet-stream",
       "Content-Length": String(buf.byteLength),
-      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(filename)}`
+      "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(filename)}`
     }
   });
+  } catch (err) {
+    console.error("[download] 异常:", err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
 }

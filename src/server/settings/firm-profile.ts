@@ -24,7 +24,10 @@ export const CATEGORY_WORD_DEFAULTS: Record<MatterCategory, string> = {
   ADMINISTRATIVE: "行诉",
   NON_LITIGATION: "非诉",
   LEGAL_COUNSEL: "顾问",
-  SPECIAL_PROJECT: "专项"
+  SPECIAL_PROJECT: "专项",
+  AGENT_FILING: "代立",
+  CONSULTATION: "咨询",
+  PUBLIC_SOURCE: "公源"
 };
 
 /** {类} 单字简称（固定，不可编辑） */
@@ -36,7 +39,10 @@ export const CATEGORY_ABBR: Record<MatterCategory, string> = {
   ADMINISTRATIVE: "行",
   NON_LITIGATION: "非",
   LEGAL_COUNSEL: "顾",
-  SPECIAL_PROJECT: "专"
+  SPECIAL_PROJECT: "专",
+  AGENT_FILING: "代",
+  CONSULTATION: "咨",
+  PUBLIC_SOURCE: "公"
 };
 
 export interface FirmProfile {

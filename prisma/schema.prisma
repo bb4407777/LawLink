@@ -32,13 +32,42 @@ enum MatterCategory {
   NON_LITIGATION // 非诉项目
   LEGAL_COUNSEL // 常年顾问
   SPECIAL_PROJECT // 法律专项
+  AGENT_FILING   // v0.46 代立案
+  CONSULTATION   // v0.46 咨询
+  PUBLIC_SOURCE  // v0.46 公共案源
 }
 
 enum MatterStatus {
   PENDING_ACCEPTANCE
   IN_PROGRESS
+  FILING_MATERIALS       // v0.46 做立案材料
+  FILING_MATERIALS_SIGN  // v0.46 立案材料待签名
+  ONLINE_FILING          // v0.46 做网上立案
+  ONLINE_FILING_REVIEW   // v0.46 网上立案待审核
+  FILING_ACCEPTED        // v0.46 网上立案通过
+  FEE_PAYMENT_PENDING    // v0.46 交费单待交费
+  FEE_PAID               // v0.46 交费单交费后
+  HEARING_SCHEDULED      // v0.46 有开庭时间
+  POST_HEARING           // v0.46 庭后未判决
+  POST_JUDGMENT          // v0.46 判决后待上诉
+  EXECUTION_MATERIALS    // v0.46 做执行资料
+  EXECUTION_MATERIALS_SIGN // v0.46 执行材料待签名
+  EXECUTION_ONLINE_FILING  // v0.46 做执行网上立案
+  EXECUTION_ONLINE_REVIEW  // v0.46 执行网上立案待审核
+  EXECUTION_PRESERVATION   // v0.46 执行保全阶段
+  EXECUTION               // v0.46 执行阶段
+  INVESTIGATION          // v0.46 侦查阶段（刑事，保留兼容）
+  DETENTION_30          // v0.46 拘留30天（刑事）
+  ARREST_REVIEW_7       // v0.46 审查逮捕7天（刑事）
+  POST_ARREST_REVIEW    // v0.46 审查逮捕后（刑事）
+  CUSTODY_NECESSITY     // v0.46 羁押必要性审查10天（刑事）
+  BAIL_PENDING           // v0.46 取保候审（刑事）
+  PROSECUTION_REVIEW     // v0.46 审查起诉（刑事）
+  TRIAL                  // v0.46 审判阶段（刑事）
+  CRIMINAL_EXECUTION     // v0.46 执行阶段（刑事）
   ON_HOLD
   CLOSED
+  PENDING_ARCHIVE
   ARCHIVED
 }
 
@@ -73,6 +102,7 @@ enum LitigationStanding {
   EXECUTED_PERSON
   // 刑事
   CRIMINAL_DEFENDANT
+  CRIMINAL_DEFENDANT_FAMILY // 被告人亲属
   CRIMINAL_VICTIM
   PRIVATE_PROSECUTOR
   CRIMINAL_INCIDENTAL_PLAINTIFF
@@ -103,6 +133,7 @@ enum InvoiceItem {
   LAWYER_FEE // 律师服务费
   CONSULTING_FEE // 法律咨询费
   AGENCY_FEE // 代理费
+  IDENTITY
   OTHER // 其他法律服务
 }
 
@@ -138,6 +169,8 @@ enum ProcedureType {
   // 执行
   ENFORCEMENT
   ENFORCEMENT_OBJECTION
+  // 保全
+  PRESERVATION
   // 刑事
   INVESTIGATION
   PROSECUTION_REVIEW
@@ -173,6 +206,7 @@ enum ProcedureOutcome {
   DISMISSED
   COMPLETED
   TRANSFERRED
+  IDENTITY
   OTHER
 }
 
@@ -183,6 +217,7 @@ enum PartyRole {
   CO_LITIGANT
   AGENT
   WITNESS
+  IDENTITY
   OTHER
 }
 
@@ -197,6 +232,7 @@ enum PartyType {
   INSTITUTION
   SOCIAL_ORG
   GOVERNMENT
+  IDENTITY
   OTHER_ORG
 }
 
@@ -206,6 +242,7 @@ enum BarFilingType {
   COLLECTIVE // 涉集体案件
   SENSITIVE // 涉敏感案件
   MAJOR // 涉重大案件
+  IDENTITY
   OTHER // 其他特殊案件
 }
 
@@ -262,6 +299,7 @@ enum NoteChannel {
   EMAIL
   MEETING
   COURT
+  IDENTITY
   OTHER
 }
 
@@ -271,6 +309,7 @@ enum DocumentCategory {
   PROCEDURE
   JUDGMENT
   CONTRACT
+  ID_CARD
   OTHER
 }
 
@@ -337,7 +376,7 @@ model User {
   phone        String?
   avatar       String?
   active       Boolean   @default(true)
-  lastLoginAt  DateTime?
+  lastLoginAt  DateTime? @db.Timestamptz(3)
 
   ownedMatters          Matter[]              @relation("MatterOwner")
   memberships           MatterMember[]
@@ -379,8 +418,8 @@ model User {
   reviewedExternalContacts ExternalContact[]  @relation("ExternalContactReviewer")
   // v0.44: 程序主办律师
   leadProcedures         MatterProcedure[]     @relation("ProcedureLeadLawyer")
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @updatedAt
+  createdAt             DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime              @updatedAt @db.Timestamptz(3)
 }
 
 // ============================================================
@@ -394,6 +433,7 @@ model Client {
   idNumber    String?
   address     String?
   phone       String?
+  wechat      String?   // 微信号
   email       String?
   source      String?
   tags        String[]
@@ -409,12 +449,69 @@ model Client {
   intakes     Intake[]
   matterLinks MatterClient[]
   matters     Matter[]
-  deletedAt   DateTime?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime? @db.Timestamptz(3)
+  createdAt   DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime       @updatedAt @db.Timestamptz(3)
 
   @@index([name])
   @@index([idNumber])
+}
+
+// ============================================================
+// 对方当事人库 — 独立 reusable 库，类似 Client 但更轻量
+// Party 表中 role=OPPOSING_PARTY 可通过 FK 关联到此库
+// ============================================================
+
+model OpposingParty {
+  id        String    @id @default(cuid())
+  name      String
+  partyType PartyType @default(NATURAL_PERSON)
+  idNumber  String?
+  phone     String?
+  address   String?
+  legalRep  String?
+  notes     String?
+  tags      String[]
+  internalCode String? @unique // DF-{YYYY}-{4位}
+
+  parties   Party[]
+
+  deletedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([name])
+  @@index([idNumber])
+}
+
+// ============================================================
+// 潜在客户库 — 跟 Client 类似，但尚未签约
+// ============================================================
+
+model PotentialClient {
+  id      String    @id @default(cuid())
+  name    String
+  type    ClientType  @default(INDIVIDUAL)
+  phone   String?
+  gender  ClientGender?
+  idNumber String?
+  address String?
+  email   String?
+  legalRep String?
+  ethnicity String?
+  industry String?
+  wechat  String?   // 微信号
+  douyin  String?   // 抖音号
+  notes   String?
+  source  String?
+  tags    String[]
+  internalCode String? @unique   // PC-{YYYY}-{NNNN}
+  contactedAt DateTime? @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@index([name])
 }
 
 model Contact {
@@ -428,8 +525,8 @@ model Contact {
   wechat    String?
   isPrimary Boolean  @default(false)
   notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([clientId])
 }
@@ -454,8 +551,8 @@ model CauseOfAction {
   matters    Matter[]
   intakes    Intake[]
   sourceNote String?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  createdAt  DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime        @updatedAt @db.Timestamptz(3)
 
   @@unique([category, code])
   @@index([category, level])
@@ -477,7 +574,7 @@ model Intake {
   causeFreeText  String?
   description    String?
   status         IntakeStatus   @default(INTAKE)
-  receivedAt     DateTime       @default(now())
+  receivedAt     DateTime       @default(now()) @db.Timestamptz(3)
   declinedReason String?
 
   // v0.5: 客户 + 联系人
@@ -504,8 +601,8 @@ model Intake {
   serviceScope String? // 服务范围 / 内容（非诉/专项/顾问）
   deliverables String? // 交付成果（非诉/专项）
   counselType  String? // 顾问类型：常年 / 专项（顾问）
-  serviceStart DateTime? // 起始 / 顾问期限起
-  serviceEnd   DateTime? // 结束 / 顾问期限止
+  serviceStart DateTime? // 起始 / 顾问期限起 @db.Timestamptz(3)
+  serviceEnd   DateTime? // 结束 / 顾问期限止 @db.Timestamptz(3)
 
   // v0.5: 律师费
   feeType          FeeType?
@@ -525,8 +622,8 @@ model Intake {
   documents      Document[]
 
   createdById String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([status, receivedAt])
   @@index([causeId])
@@ -540,7 +637,6 @@ model Intake {
 model Matter {
   id           String         @id @default(cuid())
   internalCode String         @unique
-  firmCaseNo   String?        @unique // v0.42 所内案号（按可配置模板生成）
   title        String
   category     MatterCategory @default(CIVIL_COMMERCIAL)
   status       MatterStatus   @default(IN_PROGRESS)
@@ -561,10 +657,10 @@ model Matter {
   serviceScope String? // 服务范围 / 内容
   deliverables String? // 交付成果（非诉/专项）
   counselType  String? // 顾问类型（顾问）
-  serviceStart DateTime? // 起始 / 顾问期限起
-  serviceEnd   DateTime? // 结束 / 顾问期限止
+  serviceStart DateTime? // 起始 / 顾问期限起 @db.Timestamptz(3)
+  serviceEnd   DateTime? // 结束 / 顾问期限止 @db.Timestamptz(3)
 
-  intakeDate DateTime?
+  intakeDate DateTime? @db.Timestamptz(3)
 
   primaryClientId String?
   primaryClient   Client?        @relation(fields: [primaryClientId], references: [id])
@@ -577,9 +673,9 @@ model Matter {
   intakeId String? @unique
   intake   Intake? @relation(fields: [intakeId], references: [id])
 
-  firstAcceptedAt DateTime?
-  closedAt        DateTime?
-  archivedAt      DateTime?
+  firstAcceptedAt DateTime? @db.Timestamptz(3)
+  closedAt        DateTime? @db.Timestamptz(3)
+  archivedAt      DateTime? @db.Timestamptz(3)
 
   procedures       MatterProcedure[]
   parties          Party[]
@@ -609,9 +705,9 @@ model Matter {
   // v0.28: 自定义字段值（{ [CustomFieldDef.key]: string }）
   customValues Json @default("{}")
 
-  deletedAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
 
   @@index([status, updatedAt])
   @@index([ownerId])
@@ -643,8 +739,8 @@ model CustomFieldDef {
   required   Boolean           @default(false)
   order      Int               @default(0)
   enabled    Boolean           @default(true)
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  createdAt  DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime          @updatedAt @db.Timestamptz(3)
 
   @@unique([entityType, key])
   @@index([entityType, order])
@@ -656,7 +752,7 @@ model MatterMember {
   userId   String
   user     User             @relation(fields: [userId], references: [id])
   role     MatterMemberRole @default(ASSISTANT)
-  joinedAt DateTime         @default(now())
+  joinedAt DateTime         @default(now()) @db.Timestamptz(3)
 
   @@id([matterId, userId])
   @@index([userId])
@@ -669,7 +765,7 @@ model MatterClient {
   client    Client   @relation(fields: [clientId], references: [id])
   label     String?
   isPrimary Boolean  @default(false)
-  addedAt   DateTime @default(now())
+  addedAt   DateTime @default(now()) @db.Timestamptz(3)
 
   @@id([matterId, clientId])
   @@index([clientId])
@@ -707,8 +803,8 @@ model MatterProcedure {
   leadLawyer     User?   @relation("ProcedureLeadLawyer", fields: [leadLawyerId], references: [id], onDelete: SetNull)
   isExternalLead Boolean @default(false) // 是否非本所代理
 
-  acceptedAt  DateTime? // 立案时间
-  concludedAt DateTime? // 裁决 / 结案时间
+  acceptedAt  DateTime? // 立案时间 @db.Timestamptz(3)
+  concludedAt DateTime? // 裁决 / 结案时间 @db.Timestamptz(3)
 
   status      ProcedureStatus   @default(PENDING)
   outcome     ProcedureOutcome?
@@ -722,8 +818,8 @@ model MatterProcedure {
   // v0.42: 程序备忘录（待办/已办）
   memos     ProcedureMemo[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@unique([matterId, order])
   @@index([matterId, order])
@@ -737,11 +833,11 @@ model MatterStage {
   name        String
   description String?
   order       Int
-  startedAt   DateTime?
-  completedAt DateTime?
+  startedAt   DateTime? @db.Timestamptz(3)
+  completedAt DateTime? @db.Timestamptz(3)
   tasks       Task[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @db.Timestamptz(3)
 
   @@index([procedureId, order])
 }
@@ -752,19 +848,19 @@ model MatterStage {
 
 model Task {
   id          String       @id @default(cuid())
-  matterId    String
-  matter      Matter       @relation(fields: [matterId], references: [id], onDelete: Cascade)
+  matterId    String?
+  matter      Matter?      @relation(fields: [matterId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   stageId     String?
   stage       MatterStage? @relation(fields: [stageId], references: [id])
   title       String
   description String?
   assigneeId  String?
-  dueAt       DateTime?
+  dueAt       DateTime? @db.Timestamptz(3)
   completed   Boolean      @default(false)
-  completedAt DateTime?
+  completedAt DateTime? @db.Timestamptz(3)
   priority    Int          @default(0)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime     @updatedAt @db.Timestamptz(3)
 
   @@index([matterId, completed, dueAt])
   @@index([assigneeId, completed])
@@ -779,11 +875,11 @@ model Hearing {
   address     String?
   judge       String?
   contact     String?
-  startsAt    DateTime
-  endsAt      DateTime?
+  startsAt    DateTime @db.Timestamptz(3)
+  endsAt      DateTime? @db.Timestamptz(3)
   notes       String?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @db.Timestamptz(3)
 
   @@index([procedureId, startsAt])
   @@index([startsAt])
@@ -795,13 +891,13 @@ model Deadline {
   procedure   MatterProcedure  @relation(fields: [procedureId], references: [id], onDelete: Cascade)
   title       String
   category    DeadlineCategory @default(CUSTOM)
-  dueAt       DateTime
+  dueAt       DateTime @db.Timestamptz(3)
   basis       String?
   remindDays  Int              @default(3)
   completed   Boolean          @default(false)
-  completedAt DateTime?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  completedAt DateTime? @db.Timestamptz(3)
+  createdAt   DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @db.Timestamptz(3)
 
   @@index([procedureId, dueAt, completed])
   @@index([dueAt, completed])
@@ -814,10 +910,10 @@ model ProcedureMemo {
   procedure   MatterProcedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
   content     String
   done        Boolean         @default(false)
-  doneAt      DateTime?
+  doneAt      DateTime? @db.Timestamptz(3)
   createdById String
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @db.Timestamptz(3)
 
   @@index([procedureId])
 }
@@ -850,10 +946,13 @@ model Party {
   enterpriseId         String?
   enterpriseSocialCode String?
   enterpriseName       String?
-  enterpriseBoundAt    DateTime?
+  enterpriseBoundAt    DateTime? @db.Timestamptz(3)
+  // v0.46: 关联对方当事人库
+  opposingPartyId String?
+  opposingParty   OpposingParty? @relation(fields: [opposingPartyId], references: [id], onDelete: SetNull)
   procedureParties     ProcedureParty[]
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
+  createdAt DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime            @updatedAt @db.Timestamptz(3)
 
   @@index([matterId, role, ordinal])
   @@index([name])
@@ -870,8 +969,8 @@ model ProcedureParty {
   standing    LitigationStanding
   ordinal     Int                @default(1)
   note        String?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  createdAt   DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime           @updatedAt @db.Timestamptz(3)
 
   @@unique([procedureId, partyId, standing])
   @@index([procedureId, standing, ordinal])
@@ -886,8 +985,8 @@ model RelatedEntity {
   name         String
   relationship String
   notes        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([name])
 }
@@ -899,7 +998,7 @@ model MatterLink {
   matter          Matter   @relation("MatterLinkFrom", fields: [matterId], references: [id], onDelete: Cascade)
   relatedMatterId String
   relatedMatter   Matter   @relation("MatterLinkTo", fields: [relatedMatterId], references: [id], onDelete: Cascade)
-  createdAt       DateTime @default(now())
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
 
   @@unique([matterId, relatedMatterId])
   @@index([matterId])
@@ -919,9 +1018,9 @@ model ConflictCheck {
   conclusion   ConflictConclusion @default(PENDING)
   decidedById  String?
   decidedBy    User?              @relation("ConflictDecidedBy", fields: [decidedById], references: [id])
-  decidedAt    DateTime?
+  decidedAt    DateTime? @db.Timestamptz(3)
   note         String?
-  checkedAt    DateTime           @default(now())
+  checkedAt    DateTime           @default(now()) @db.Timestamptz(3)
 }
 
 model ConflictHit {
@@ -945,19 +1044,19 @@ model ConflictHit {
 
 model Note {
   id          String      @id @default(cuid())
-  matterId    String
-  matter      Matter      @relation(fields: [matterId], references: [id], onDelete: Cascade)
+  matterId    String?
+  matter      Matter?     @relation(fields: [matterId], references: [id], onDelete: Cascade)
   authorId    String
   author      User        @relation("NoteAuthor", fields: [authorId], references: [id])
   channel     NoteChannel @default(OTHER)
   withWhom    String?
-  occurredAt  DateTime    @default(now())
+  occurredAt  DateTime    @default(now()) @db.Timestamptz(3)
   content     String
   tags        String[]
   attachments String[]
-  deletedAt   DateTime?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?   @db.Timestamptz(3)
+  createdAt   DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime    @updatedAt @db.Timestamptz(3)
 
   @@index([matterId, occurredAt])
 }
@@ -983,10 +1082,10 @@ model Document {
   status      DocumentStatus   @default(DRAFT)
   reviewedById String?
   reviewedBy   User?            @relation("DocumentReviewer", fields: [reviewedById], references: [id])
-  reviewedAt   DateTime?
+  reviewedAt   DateTime? @db.Timestamptz(3)
   approvedById String?
   approvedBy   User?            @relation("DocumentApprover", fields: [approvedById], references: [id])
-  approvedAt   DateTime?
+  approvedAt   DateTime? @db.Timestamptz(3)
   version     Int              @default(1)
   isLatest    Boolean          @default(true)
   familyId    String?
@@ -1004,9 +1103,9 @@ model Document {
   tags         String[]
   uploadedById String
   uploadedBy   User      @relation("DocumentUploader", fields: [uploadedById], references: [id])
-  deletedAt    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime? @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
 
   // v0.5: 发票工作流附件反向
   invoiceAsContract InvoiceRequest? @relation("InvoiceContractScan")
@@ -1070,15 +1169,15 @@ model InvoiceRequest {
 
   // v0.14: 真实发票号（财务开票完成时回填）
   invoiceNo String?
-  issuedAt  DateTime?
+  issuedAt  DateTime? @db.Timestamptz(3)
 
   requestedById String
   requestedBy   User     @relation("InvoiceRequester", fields: [requestedById], references: [id])
-  requestedAt   DateTime @default(now())
+  requestedAt   DateTime @default(now()) @db.Timestamptz(3)
 
   processedById String?
   processedBy   User?     @relation("InvoiceProcessor", fields: [processedById], references: [id])
-  processedAt   DateTime?
+  processedAt   DateTime? @db.Timestamptz(3)
   processNote   String?
 
   // 财务上传：扫描件合同 + 电子发票文件（均走 Document）
@@ -1087,8 +1186,8 @@ model InvoiceRequest {
   invoiceFileId  String?   @unique
   invoiceFile    Document? @relation("InvoiceFile", fields: [invoiceFileId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([matterId, status])
   @@index([status, requestedAt])
@@ -1107,10 +1206,10 @@ model Billing {
   contractAmount Decimal       @db.Decimal(14, 2)
   schedule       String?
   status         BillingStatus @default(DRAFT)
-  signedAt       DateTime?
+  signedAt       DateTime? @db.Timestamptz(3)
   feeEntries     FeeEntry[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime      @updatedAt @db.Timestamptz(3)
 
   @@index([matterId, status])
 }
@@ -1123,7 +1222,7 @@ model FeeEntry {
   billing      Billing?     @relation(fields: [billingId], references: [id])
   type         FeeEntryType
   amount       Decimal      @db.Decimal(14, 2)
-  occurredAt   DateTime     @default(now())
+  occurredAt   DateTime     @default(now()) @db.Timestamptz(3)
   invoiceNo    String?
   invoiceFile  String?
   payerOrPayee String?
@@ -1140,8 +1239,8 @@ model FeeEntry {
   recordedById String
   recordedBy   User   @relation("FeeRecorder", fields: [recordedById], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([matterId, type, occurredAt])
   @@index([type, occurredAt])
@@ -1157,8 +1256,8 @@ model CommissionPlan {
   percent   Decimal  @db.Decimal(5, 2)
   label     String?
   active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@unique([matterId, userId])
   @@index([matterId])
@@ -1176,10 +1275,10 @@ model TimelineEvent {
   eventType  String
   title      String
   content    String?
-  occurredAt DateTime
+  occurredAt DateTime @db.Timestamptz(3)
   refType    String?
   refId      String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([matterId, occurredAt])
 }
@@ -1199,7 +1298,7 @@ model ArchiveRecord {
   summary         String
   judgmentSummary String?
   closedReason    ArchiveClosedReason?
-  completedAt     DateTime?
+  completedAt     DateTime? @db.Timestamptz(3)
   checklistJson   Json
   missingItems    String[]
 
@@ -1208,14 +1307,14 @@ model ArchiveRecord {
 
   archivedBy   String  // 申请人姓名快照（兼容历史，不删）
   archivedById String? // v0.18: 申请人 User.id，用于审批通知路由
-  archivedAt   DateTime @default(now())
+  archivedAt   DateTime @default(now()) @db.Timestamptz(3)
   exportPath   String?
   checksum     String?
 
   // v0.16: 归档审批流
   status       ArchiveStatus @default(PENDING_REVIEW)
   reviewedById String?
-  reviewedAt   DateTime?
+  reviewedAt   DateTime? @db.Timestamptz(3)
   reviewNote   String?
 
   @@index([matterId])
@@ -1230,6 +1329,7 @@ enum ArchiveClosedReason {
   WITHDRAWAL
   SETTLEMENT
   RULING
+  IDENTITY
   OTHER
 }
 
@@ -1243,7 +1343,7 @@ model AuditLog {
   detail     Json?
   ip         String?
   userAgent  String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([userId, createdAt])
   @@index([action, createdAt])
@@ -1259,8 +1359,8 @@ model StageTemplate {
   isDefault     Boolean       @default(true)
   name          String
   steps         Json
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
 
   @@index([procedureType])
 }
@@ -1268,7 +1368,7 @@ model StageTemplate {
 model SystemSetting {
   key       String   @id
   value     Json
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 }
 
 // ============================================================
@@ -1290,8 +1390,8 @@ model DocumentTemplate {
   createdById          String?
   createdBy            User?            @relation("TemplateCreator", fields: [createdById], references: [id])
   generatedDocs        Document[]       @relation("TemplateGenerated")
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
+  createdAt            DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime         @updatedAt @db.Timestamptz(3)
 
   @@index([category, enabled])
   @@index([isBuiltIn])
@@ -1306,8 +1406,8 @@ model DocumentFolder {
   orderIndex Int        @default(0)
   isDefault  Boolean    @default(false) // 系统按案件类别预置（可改名不可删）
   documents  Document[]
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  createdAt  DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime   @updatedAt @db.Timestamptz(3)
 
   @@unique([matterId, name])
   @@index([matterId, orderIndex])
@@ -1325,7 +1425,7 @@ model SealTypeConfig {
   approverRoles    UserRole[] // 多角色 OR 关系；空数组 = 仅 requiresLegalRep 生效
   requiresLegalRep Boolean    @default(false) // 必须法定代表人本人审批（取 SystemSetting key=firmLegalRepUserId）
   enabled          Boolean    @default(true)
-  updatedAt        DateTime   @updatedAt
+  updatedAt        DateTime   @updatedAt @db.Timestamptz(3)
 }
 
 // 用章申请
@@ -1355,25 +1455,25 @@ model SealRequest {
 
   requestedById String
   requestedBy   User     @relation("SealRequester", fields: [requestedById], references: [id])
-  requestedAt   DateTime @default(now())
+  requestedAt   DateTime @default(now()) @db.Timestamptz(3)
 
   approvedById String?
   approvedBy   User?     @relation("SealApprover", fields: [approvedById], references: [id])
-  approvedAt   DateTime?
+  approvedAt   DateTime? @db.Timestamptz(3)
 
   stampedById   String?
   stampedByUser User?     @relation("SealStamper", fields: [stampedById], references: [id])
-  stampedAt     DateTime?
+  stampedAt     DateTime? @db.Timestamptz(3)
 
-  rejectedAt DateTime?
+  rejectedAt DateTime? @db.Timestamptz(3)
 
   // 被驳回后重新申请的溯源链（旧 → 新）
   parentSealRequestId String?
   parentSealRequest   SealRequest?  @relation("SealResubmission", fields: [parentSealRequestId], references: [id])
   resubmissions       SealRequest[] @relation("SealResubmission")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([status, requestedAt])
   @@index([requestedById, status])
@@ -1395,6 +1495,7 @@ enum SmsType {
   FILING_NOTICE // 立案通知
   JUDGMENT_NOTICE // 判决通知
   EVIDENCE_SUBMIT // 提交材料 / 举证
+  IDENTITY
   OTHER
 }
 
@@ -1408,7 +1509,7 @@ enum SmsMatchSource {
 model SmsMessage {
   id           String   @id @default(cuid())
   rawText      String // 原始短信全文
-  receivedAt   DateTime @default(now())
+  receivedAt   DateTime @default(now()) @db.Timestamptz(3)
   receivedById String
   receivedBy   User     @relation("SmsReceiver", fields: [receivedById], references: [id], onDelete: Restrict)
 
@@ -1426,10 +1527,10 @@ model SmsMessage {
   generatedDeadlineId String?
 
   processed   Boolean   @default(false)
-  processedAt DateTime?
+  processedAt DateTime? @db.Timestamptz(3)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([receivedById, processed, receivedAt])
   @@index([matchedMatterId])
@@ -1452,6 +1553,7 @@ enum PropertyType {
   VEHICLE // 车辆
   EQUITY // 股权
   IP // 知识产权
+  IDENTITY
   OTHER // 其他财产
 }
 
@@ -1481,10 +1583,10 @@ model Preservation {
   respondent    String // 被保全人
   guaranteeType GuaranteeType?
 
-  appliedAt  DateTime? // 申请日
-  startDate  DateTime // 生效日（必填）
+  appliedAt  DateTime? // 申请日 @db.Timestamptz(3)
+  startDate  DateTime // 生效日（必填） @db.Timestamptz(3)
   duration   Int // 保全期限（天）；默认按 propertyType 推荐
-  expiryDate DateTime // 到期日 = startDate + duration（可手动覆盖）
+  expiryDate DateTime // 到期日 = startDate + duration（可手动覆盖） @db.Timestamptz(3)
 
   court          String?
   rulingNumber   String?
@@ -1499,8 +1601,8 @@ model Preservation {
   status     PreservationStatus    @default(ACTIVE)
   renewals   PreservationRenewal[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([matterId])
   @@index([status, expiryDate])
@@ -1512,15 +1614,15 @@ model PreservationRenewal {
   preservationId String
   preservation   Preservation @relation(fields: [preservationId], references: [id], onDelete: Cascade)
 
-  renewedAt       DateTime
-  oldExpiryDate   DateTime
-  newExpiryDate   DateTime
+  renewedAt       DateTime @db.Timestamptz(3)
+  oldExpiryDate   DateTime @db.Timestamptz(3)
+  newExpiryDate   DateTime @db.Timestamptz(3)
   renewalDuration Int // 新增的天数
   note            String?
 
   performedById String
   performedBy   User     @relation("RenewalPerformer", fields: [performedById], references: [id], onDelete: Restrict)
-  createdAt     DateTime @default(now())
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([preservationId])
 }
@@ -1539,7 +1641,7 @@ model PreservationCase {
   court         String?
   rulingNumber  String?
   guaranteeType GuaranteeType?
-  appliedAt     DateTime?
+  appliedAt     DateTime? @db.Timestamptz(3)
   note          String?
 
   ownerId String?
@@ -1548,8 +1650,8 @@ model PreservationCase {
   remindDays Int[] @default([30, 15, 7, 3, 1])
 
   targets   PreservationTarget[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([matterId])
   @@index([status])
@@ -1564,8 +1666,8 @@ model PreservationTarget {
   note String?
 
   properties PreservationProperty[]
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([caseId])
 }
@@ -1578,14 +1680,14 @@ model PreservationProperty {
   propertyType   PropertyType
   propertyDetail String?
   amount         Decimal?           @db.Decimal(18, 2)
-  startDate      DateTime
+  startDate      DateTime @db.Timestamptz(3)
   duration       Int
-  expiryDate     DateTime
+  expiryDate     DateTime @db.Timestamptz(3)
   status         PreservationStatus @default(ACTIVE)
 
   renewals  PreservationPropertyRenewal[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([targetId])
   @@index([status, expiryDate])
@@ -1596,15 +1698,15 @@ model PreservationPropertyRenewal {
   propertyId String
   property   PreservationProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
-  renewedAt       DateTime
-  oldExpiryDate   DateTime
-  newExpiryDate   DateTime
+  renewedAt       DateTime @db.Timestamptz(3)
+  oldExpiryDate   DateTime @db.Timestamptz(3)
+  newExpiryDate   DateTime @db.Timestamptz(3)
   renewalDuration Int
   note            String?
 
   performedById String
   performedBy   User @relation("PropertyRenewalPerformer", fields: [performedById], references: [id], onDelete: Restrict)
-  createdAt     DateTime @default(now())
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([propertyId])
 }
@@ -1630,13 +1732,13 @@ model ExpressTracking {
   recipientPhone String?
 
   lastState    String? // 揽件 / 在途 / 到达派件 / 已签收 / 退签 / 疑难
-  lastUpdateAt DateTime?
+  lastUpdateAt DateTime? @db.Timestamptz(3)
   tracesJson   Json? // 完整轨迹快照（旧次刷新覆盖；不入历史）
 
   createdById String
   createdBy   User     @relation("ExpressCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([matterId])
   @@index([trackingNo])
@@ -1679,8 +1781,8 @@ model Notification {
   refType    String?
   refId      String?
   read       Boolean              @default(false)
-  readAt     DateTime?
-  createdAt  DateTime             @default(now())
+  readAt     DateTime? @db.Timestamptz(3)
+  createdAt  DateTime             @default(now()) @db.Timestamptz(3)
 
   @@index([userId, read, createdAt])
   @@index([userId, createdAt])
@@ -1696,7 +1798,7 @@ model ReviewRecord {
   document     Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   reviewedById String
   reviewedBy   User     @relation("ReviewAuthor", fields: [reviewedById], references: [id])
-  reviewedAt   DateTime @default(now())
+  reviewedAt   DateTime @default(now()) @db.Timestamptz(3)
 
   itemCount         Int
   itemsJson         Json    // ReviewItem[]
@@ -1717,6 +1819,7 @@ enum FirmFileCategory {
   CONTRACT   // 合同
   LETTER     // 函件
   LICENSE    // 证照
+  IDENTITY
   OTHER_FIRM // 其他
 }
 
@@ -1740,9 +1843,9 @@ model FirmFile {
   supersededBy   FirmFile?  @relation("FirmFileSupersedes", fields: [supersededById], references: [id])
   supersedes     FirmFile[] @relation("FirmFileSupersedes")
 
-  archivedAt DateTime? // soft delete
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime? // soft delete @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
 
   @@index([category, archivedAt, createdAt])
   @@index([supersededById])
@@ -1754,14 +1857,14 @@ model Announcement {
   title       String
   content     String   @db.Text
   pinned      Boolean  @default(false)
-  publishedAt DateTime @default(now())
+  publishedAt DateTime @default(now()) @db.Timestamptz(3)
   // 到期后 banner 不再显示；列表仍保留
-  expiresAt   DateTime?
+  expiresAt   DateTime? @db.Timestamptz(3)
   authorId    String
   author      User     @relation("AnnouncementAuthor", fields: [authorId], references: [id])
-  archivedAt  DateTime? // soft delete
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  archivedAt  DateTime? // soft delete @db.Timestamptz(3)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([pinned, archivedAt, publishedAt])
   @@index([authorId, createdAt])
@@ -1774,6 +1877,7 @@ enum ExternalContactCategory {
   POLICE      // 公安
   NOTARY      // 公证处
   ARBITRATION // 仲裁机构
+  ID_CARD     // 身份信息
   OTHER_FIRM  // 他所律师
   EXPERT      // 鉴定 / 评估专家
   OTHER       // 其他
@@ -1803,11 +1907,11 @@ model ExternalContact {
   status       ExternalContactStatus @default(APPROVED)
   reviewedById String?
   reviewedBy   User?                 @relation("ExternalContactReviewer", fields: [reviewedById], references: [id])
-  reviewedAt   DateTime?
+  reviewedAt   DateTime? @db.Timestamptz(3)
   reviewNote   String?
-  archivedAt   DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  archivedAt   DateTime? @db.Timestamptz(3)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([category, archivedAt, name])
   @@index([status, archivedAt, createdAt])

@@ -1,0 +1,270 @@
+-- Merge duplicate matters: keep old code, delete LL-2026 version
+-- Run: psql -U lawlink -d lawlink -h localhost -f scripts/merge-duplicates.sql
+
+BEGIN;
+
+-- Pair 1: 25民1010 keep, LL-2026-CC-0492 remove
+UPDATE "Party" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "MatterProcedure" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "Billing" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "FeeEntry" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "Document" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "TimelineEvent" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "Note" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "Task" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "MatterClient" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "MatterLink" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "MatterLink" SET "relatedMatterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "relatedMatterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "CommissionPlan" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "InvoiceRequest" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "SealRequest" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "SmsMessage" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "Preservation" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "PreservationCase" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "ExpressTracking" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "ReviewRecord" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "ArchiveRecord" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "DocumentFolder" SET "matterId" = 'cmqgix8ta04dpgmram6djnfrn' WHERE "matterId" = 'cmqgoy0r707pcgmraxzdzydo2';
+UPDATE "Matter" SET "deletedAt" = NOW() WHERE id = 'cmqgoy0r707pcgmraxzdzydo2';
+
+-- Pair 2: 25民1109 keep, LL-2026-CC-0515 remove
+UPDATE "Party" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "MatterProcedure" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "Billing" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "FeeEntry" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "Document" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "TimelineEvent" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "Note" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "Task" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "MatterClient" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "MatterLink" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "MatterLink" SET "relatedMatterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "relatedMatterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "CommissionPlan" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "InvoiceRequest" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "SealRequest" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "SmsMessage" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "Preservation" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "PreservationCase" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "ExpressTracking" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "ReviewRecord" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "ArchiveRecord" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "DocumentFolder" SET "matterId" = 'cmqgix8si04cpgmra8o3fuz6r' WHERE "matterId" = 'cmqgoy11y080wgmraeu0z8vn8';
+UPDATE "Matter" SET "deletedAt" = NOW() WHERE id = 'cmqgoy11y080wgmraeu0z8vn8';
+
+-- Pair 3: 25民211 keep, LL-2026-CC-0428 remove
+UPDATE "Party" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "MatterProcedure" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "Billing" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "FeeEntry" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "Document" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "TimelineEvent" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "Note" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "Task" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "MatterClient" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "MatterLink" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "MatterLink" SET "relatedMatterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "relatedMatterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "CommissionPlan" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "InvoiceRequest" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "SealRequest" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "SmsMessage" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "Preservation" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "PreservationCase" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "ExpressTracking" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "ReviewRecord" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "ArchiveRecord" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "DocumentFolder" SET "matterId" = 'cmqgix8z504ipgmraex9uk7oh' WHERE "matterId" = 'cmqgoxzuw06sngmraja53liqf';
+UPDATE "Matter" SET "deletedAt" = NOW() WHERE id = 'cmqgoxzuw06sngmraja53liqf';
+
+-- Pair 4: 25民512 keep, LL-2026-CC-0457 remove
+UPDATE "Party" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "MatterProcedure" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "Billing" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "FeeEntry" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "Document" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "TimelineEvent" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "Note" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "Task" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "MatterClient" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "MatterLink" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "MatterLink" SET "relatedMatterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "relatedMatterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "CommissionPlan" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "InvoiceRequest" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "SealRequest" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "SmsMessage" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "Preservation" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "PreservationCase" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "ExpressTracking" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "ReviewRecord" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "ArchiveRecord" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "DocumentFolder" SET "matterId" = 'cmqgix8zl04j7gmra77pt0wp9' WHERE "matterId" = 'cmqgoy080077igmra029k74bq';
+UPDATE "Matter" SET "deletedAt" = NOW() WHERE id = 'cmqgoy080077igmra029k74bq';
+
+-- Pair 5: 25民785 keep, LL-2026-CC-0478 remove
+UPDATE "Party" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "MatterProcedure" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "Billing" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "FeeEntry" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "Document" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "TimelineEvent" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "Note" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "Task" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "MatterClient" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "MatterLink" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "MatterLink" SET "relatedMatterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "relatedMatterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "CommissionPlan" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "InvoiceRequest" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "SealRequest" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "SmsMessage" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "Preservation" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "PreservationCase" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "ExpressTracking" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "ReviewRecord" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "ArchiveRecord" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "DocumentFolder" SET "matterId" = 'cmqgix8ui04epgmrae25q7c43' WHERE "matterId" = 'cmqgoy0kl07i5gmraxf5vojn2';
+UPDATE "Matter" SET "deletedAt" = NOW() WHERE id = 'cmqgoy0kl07i5gmraxf5vojn2';
+
+-- Pair 6: 25民792 keep, LL-2026-CC-0482 remove
+UPDATE "Party" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "MatterProcedure" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "Billing" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "FeeEntry" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "Document" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "TimelineEvent" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "Note" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "Task" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "MatterClient" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "MatterLink" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "MatterLink" SET "relatedMatterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "relatedMatterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "CommissionPlan" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "InvoiceRequest" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "SealRequest" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "SmsMessage" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "Preservation" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "PreservationCase" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "ExpressTracking" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "ReviewRecord" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "ArchiveRecord" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "DocumentFolder" SET "matterId" = 'cmqgix8nm047qgmrarsnlplhg' WHERE "matterId" = 'cmqgoy0mu07k4gmrax8oag208';
+UPDATE "Matter" SET "deletedAt" = NOW() WHERE id = 'cmqgoy0mu07k4gmrax8oag208';
+
+-- Pair 7: 25民892 keep, LL-2026-CC-0488 remove
+UPDATE "Party" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "MatterProcedure" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "Billing" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "FeeEntry" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "Document" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "TimelineEvent" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "Note" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "Task" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "MatterClient" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "MatterLink" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "MatterLink" SET "relatedMatterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "relatedMatterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "CommissionPlan" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "InvoiceRequest" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "SealRequest" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "SmsMessage" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "Preservation" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "PreservationCase" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "ExpressTracking" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "ReviewRecord" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "ArchiveRecord" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "DocumentFolder" SET "matterId" = 'cmqgix8ts04e7gmraibsqeyzf' WHERE "matterId" = 'cmqgoy0pf07n7gmrathlxpaau';
+UPDATE "Matter" SET "deletedAt" = NOW() WHERE id = 'cmqgoy0pf07n7gmrathlxpaau';
+
+-- Pair 8: LL-2026-CC-0301 keep, LL-2026-CC-0384 remove (张载景 财产损害赔偿)
+UPDATE "Party" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "MatterProcedure" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "Billing" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "FeeEntry" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "Document" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "TimelineEvent" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "Note" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "Task" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "MatterClient" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "MatterLink" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "MatterLink" SET "relatedMatterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "relatedMatterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "CommissionPlan" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "InvoiceRequest" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "SealRequest" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "SmsMessage" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "Preservation" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "PreservationCase" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "ExpressTracking" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "ReviewRecord" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "ArchiveRecord" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "DocumentFolder" SET "matterId" = 'cmqgoxpdp023egmravixc7w1q' WHERE "matterId" = 'cmqgoy8ce03hxgmrak9mnnz04';
+UPDATE "Matter" SET "deletedAt" = NOW() WHERE id = 'cmqgoy8ce03hxgmrak9mnnz04';
+
+-- Pair 9: LL-2026-CC-0302 keep, LL-2026-CC-0385 remove (肖开雨 财产损害赔偿)
+UPDATE "Party" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "MatterProcedure" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "Billing" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "FeeEntry" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "Document" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "TimelineEvent" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "Note" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "Task" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "MatterClient" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "MatterLink" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "MatterLink" SET "relatedMatterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "relatedMatterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "CommissionPlan" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "InvoiceRequest" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "SealRequest" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "SmsMessage" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "Preservation" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "PreservationCase" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "ExpressTracking" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "ReviewRecord" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "ArchiveRecord" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "DocumentFolder" SET "matterId" = 'cmqgoxpdq023ggmrasaw85rc9' WHERE "matterId" = 'cmqgoy8cy03i7gmra3rqdszuc';
+UPDATE "Matter" SET "deletedAt" = NOW() WHERE id = 'cmqgoy8cy03i7gmra3rqdszuc';
+
+-- Pair 10: LL-2026-CC-0303 keep, LL-2026-CC-0386 remove (查校锋 财产损害赔偿)
+UPDATE "Party" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "MatterProcedure" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "Billing" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "FeeEntry" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "Document" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "TimelineEvent" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "Note" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "Task" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "MatterClient" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "MatterLink" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "MatterLink" SET "relatedMatterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "relatedMatterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "CommissionPlan" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "InvoiceRequest" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "SealRequest" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "SmsMessage" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "Preservation" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "PreservationCase" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "ExpressTracking" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "ReviewRecord" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "ArchiveRecord" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "DocumentFolder" SET "matterId" = 'cmqgoxpd7021igmrat2gxfvy0' WHERE "matterId" = 'cmqgoy8dq03iogmra4sxdboka';
+UPDATE "Matter" SET "deletedAt" = NOW() WHERE id = 'cmqgoy8dq03iogmra4sxdboka';
+
+-- Pair 11: 26非0463 keep, 26非0508 remove (李展锋盗窃罪会见)
+UPDATE "Party" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "MatterProcedure" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "Billing" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "FeeEntry" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "Document" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "TimelineEvent" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "Note" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "Task" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "MatterClient" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "MatterLink" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "MatterLink" SET "relatedMatterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "relatedMatterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "CommissionPlan" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "InvoiceRequest" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "SealRequest" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "SmsMessage" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "Preservation" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "PreservationCase" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "ExpressTracking" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "ReviewRecord" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "ArchiveRecord" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "DocumentFolder" SET "matterId" = 'cmqgix8xf04h7gmra0i1d38e8' WHERE "matterId" = 'cmqgoy0px07oggmrae6kyov1f';
+UPDATE "Matter" SET "deletedAt" = NOW() WHERE id = 'cmqgoy0px07oggmrae6kyov1f';
+
+COMMIT;

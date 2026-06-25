@@ -1,7 +1,11 @@
 "use client";
 
+import { useTransition, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { Matter, PartyRole, LitigationStanding, Prisma } from "@prisma/client";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+import type { Matter, PartyRole, LitigationStanding } from "@prisma/client";
 import {
   matterCategoryLabel,
   matterCategoryColor,
@@ -9,6 +13,8 @@ import {
   matterStatusLabel
 } from "@/lib/enums";
 import { formatCurrency, cn } from "@/lib/utils";
+import { restoreMatter, permanentDeleteMatter } from "@/server/matters/lifecycle";
+import { Button } from "@/components/ui/button";
 
 export type MatterRow = Matter & {
   primaryClient: { id: string; name: string } | null;
@@ -18,16 +24,17 @@ export type MatterRow = Matter & {
   parties: { id: string; name: string; role: PartyRole; standing: LitigationStanding | null }[];
   archiveRecords?: { id: string }[];
   _count: { procedures: number };
-  claimAmount: Prisma.Decimal | null;
-  firmCaseNo: string | null;
+  claimAmount: number | null;
+  contractAmount: number;
+  receivedAmount: number;
   intakeDate: Date | null;
   latestHearingAt: Date | null;
 };
 
-type MetaColumn = "hearing" | "firmCaseNo";
+type MetaColumn = "hearing";
 
 const MATTER_ROW_GRID =
-  "grid gap-x-4 gap-y-2 lg:grid-cols-[7.5rem_minmax(25rem,1fr)_9rem_8rem_7rem] lg:items-center";
+  "grid gap-x-4 gap-y-2 lg:grid-cols-[6.5rem_5rem_minmax(12rem,1fr)_6rem_7rem_7rem_8rem_minmax(9rem,auto)] lg:items-center";
 
 export function CaseListHeader({
   metaColumn = "hearing"
@@ -42,9 +49,12 @@ export function CaseListHeader({
       )}
     >
       <div>收案时间</div>
+      <div>编号</div>
       <div>案件名称</div>
       <div>标的</div>
-      <div>{metaColumn === "firmCaseNo" ? "所内案号" : "开庭时间"}</div>
+      <div>合同额</div>
+      <div>已收</div>
+      <div>开庭时间</div>
       <div>状态</div>
     </div>
   );
@@ -57,6 +67,40 @@ export function MattersTable({
   items: MatterRow[];
   metaColumn?: MetaColumn;
 }) {
+  const router = useRouter();
+  const [, startRestore] = useTransition();
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+
+  function handleRestore(id: string) {
+    setRestoringId(id);
+    startRestore(async () => {
+      try {
+        await restoreMatter(id);
+        toast.success("案件已恢复");
+        router.refresh();
+      } catch (err) {
+        toast.error("恢复失败", { description: err instanceof Error ? err.message : "" });
+      } finally {
+        setRestoringId(null);
+      }
+    });
+  }
+
+  function handlePermanentDelete(id: string) {
+    if (!confirm("确定彻底删除？此操作不可撤销！案件所有数据将从数据库永久移除。")) return;
+    setRestoringId(id);
+    startRestore(async () => {
+      try {
+        await permanentDeleteMatter(id);
+        toast.success("案件已彻底删除");
+        router.refresh();
+      } catch (err) {
+        toast.error("删除失败", { description: err instanceof Error ? err.message : "" });
+      } finally {
+        setRestoringId(null);
+      }
+    });
+  }
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-md border border-border bg-card py-20 text-center">
@@ -69,7 +113,7 @@ export function MattersTable({
   }
 
   return (
-    <div className="ll-surface overflow-hidden rounded-lg">
+    <div className="ll-surface rounded-lg">
       <CaseListHeader metaColumn={metaColumn} />
       <ul>
         {items.map((m) => (
@@ -89,12 +133,18 @@ export function MattersTable({
                   : MATTER_STATUS_DOT[m.status]
             }}
             categoryShort={matterCategoryShort[m.category]}
+            internalCode={m.internalCode}
             intakeDate={m.intakeDate}
             latestHearingAt={m.latestHearingAt}
-            firmCaseNo={m.firmCaseNo}
             claimAmount={m.claimAmount ? Number(m.claimAmount) : null}
+            contractAmount={m.contractAmount}
+            receivedAmount={m.receivedAmount}
             metaColumn={metaColumn}
             inTable
+            deletedAt={m.deletedAt}
+            restoring={restoringId === m.id}
+            onRestore={m.deletedAt ? () => handleRestore(m.id) : undefined}
+            onPermanentDelete={m.deletedAt ? () => handlePermanentDelete(m.id) : undefined}
           />
         ))}
       </ul>
@@ -105,8 +155,34 @@ export function MattersTable({
 const MATTER_STATUS_DOT: Record<MatterRow["status"], string> = {
   PENDING_ACCEPTANCE: "#f59e0b",
   IN_PROGRESS: "#10b981",
+  FILING_MATERIALS: "#f97316",
+  FILING_MATERIALS_SIGN: "#fb923c",
+  ONLINE_FILING: "#eab308",
+  ONLINE_FILING_REVIEW: "#facc15",
+  FILING_ACCEPTED: "#84cc16",
+  FEE_PAYMENT_PENDING: "#f43f5e",
+  FEE_PAID: "#fb7185",
+  HEARING_SCHEDULED: "#0ea5e9",
+  POST_HEARING: "#6366f1",
+  POST_JUDGMENT: "#8b5cf6",
+  EXECUTION_MATERIALS: "#06b6d4",
+  EXECUTION_MATERIALS_SIGN: "#22d3ee",
+  EXECUTION_ONLINE_FILING: "#14b8a6",
+  EXECUTION_ONLINE_REVIEW: "#2dd4bf",
+  EXECUTION_PRESERVATION: "#ef4444",
+  EXECUTION: "#f87171",
+  INVESTIGATION: "#ea580c",
+  DETENTION_30: "#f97316",
+  ARREST_REVIEW_7: "#fb923c",
+  POST_ARREST_REVIEW: "#f59e0b",
+  CUSTODY_NECESSITY: "#eab308",
+  BAIL_PENDING: "#84cc16",
+  PROSECUTION_REVIEW: "#d97706",
+  TRIAL: "#dc2626",
+  CRIMINAL_EXECUTION: "#e11d48",
   ON_HOLD: "#94a3b8",
   CLOSED: "#3b82f6",
+  PENDING_ARCHIVE: "#94a3b8",
   ARCHIVED: "#8b5cf6"
 };
 
@@ -117,24 +193,36 @@ export function CaseListCard({
   accent,
   status,
   categoryShort,
+  internalCode = "",
   intakeDate,
   latestHearingAt = null,
-  firmCaseNo = null,
   claimAmount,
+  contractAmount = 0,
+  receivedAmount = 0,
   metaColumn = "hearing",
-  inTable = false
+  inTable = false,
+  deletedAt,
+  restoring,
+  onRestore,
+  onPermanentDelete
 }: {
   href: string;
   title: string;
   accent: string;
   status: { label: string; dot: string };
   categoryShort: string;
+  internalCode?: string;
   intakeDate: Date | null;
   latestHearingAt?: Date | null;
-  firmCaseNo?: string | null;
   claimAmount: number | null;
+  contractAmount?: number;
+  receivedAmount?: number;
   metaColumn?: MetaColumn;
   inTable?: boolean;
+  deletedAt?: Date | null;
+  restoring?: boolean;
+  onRestore?: () => void;
+  onPermanentDelete?: () => void;
 }) {
   return (
     <li className={cn(inTable ? "border-t border-border first:border-t-0" : "rounded-lg border border-border bg-card")}>
@@ -149,6 +237,12 @@ export function CaseListCard({
           <DataCell label="收案时间">
             <span className="font-mono tabular-nums text-foreground/70">
               {formatDate(intakeDate)}
+            </span>
+          </DataCell>
+
+          <DataCell label="编号">
+            <span className="font-mono tabular-nums text-[11px] text-foreground/70">
+              {internalCode || "—"}
             </span>
           </DataCell>
 
@@ -177,25 +271,62 @@ export function CaseListCard({
             </span>
           </DataCell>
 
-          <DataCell label={metaColumn === "firmCaseNo" ? "所内案号" : "开庭时间"}>
-            {metaColumn === "firmCaseNo" ? (
-              <span className="font-mono tabular-nums text-foreground/75">
-                {firmCaseNo || "—"}
-              </span>
-            ) : (
-              <span
-                className={cn(
-                  "font-mono tabular-nums",
-                  latestHearingAt ? "text-primary" : "text-muted-foreground/55"
-                )}
-              >
-                {formatDateTime(latestHearingAt)}
-              </span>
-            )}
+          <DataCell label="合同额">
+            <span className="font-mono tabular-nums text-foreground/75">
+              {formatCurrency(contractAmount)}
+            </span>
+          </DataCell>
+
+          <DataCell label="已收">
+            <span className="font-mono tabular-nums text-foreground/75">
+              {formatCurrency(receivedAmount)}
+            </span>
+          </DataCell>
+
+          <DataCell label="开庭时间">
+            <span
+              className={cn(
+                "font-mono tabular-nums",
+                latestHearingAt ? "text-primary" : "text-muted-foreground/55"
+              )}
+            >
+              {formatDateTime(latestHearingAt)}
+            </span>
           </DataCell>
 
           <DataCell label="状态">
-            <StatusChip label={status.label} dot={status.dot} />
+            <div className="flex items-center gap-1.5">
+              <StatusChip label={status.label} dot={status.dot} />
+              {onRestore && (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onRestore();
+                    }}
+                    disabled={restoring}
+                    className="inline-flex items-center gap-1 rounded-md border border-green-300 bg-green-50 px-2 py-0.5 text-[10.5px] text-green-700 hover:bg-green-100"
+                  >
+                    {restoring && <Loader2 className="h-3 w-3 animate-spin" />}
+                    恢复
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onPermanentDelete?.();
+                    }}
+                    disabled={restoring}
+                    className="inline-flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 py-0.5 text-[10.5px] text-red-600 hover:bg-red-100"
+                  >
+                    彻底删除
+                  </button>
+                </>
+              )}
+            </div>
           </DataCell>
         </div>
       </Link>
@@ -224,7 +355,7 @@ function DataCell({
 
 function formatDate(value: Date | null) {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString("zh-CN");
+  return new Date(value).toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
 function formatDateTime(value: Date | null) {

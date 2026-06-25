@@ -10,8 +10,7 @@ export function invoiceMatterSearchWhere(
   const searchWhere: Prisma.MatterWhereInput = {
     OR: [
       { title: { contains: query, mode: "insensitive" } },
-      { internalCode: { contains: query, mode: "insensitive" } },
-      { firmCaseNo: { contains: query, mode: "insensitive" } }
+      { internalCode: { contains: query, mode: "insensitive" } }
     ]
   };
 

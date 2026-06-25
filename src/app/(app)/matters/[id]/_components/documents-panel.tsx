@@ -67,6 +67,7 @@ const categoryLabel: Record<DocumentCategory, string> = {
   PROCEDURE: "程序性材料",
   JUDGMENT: "裁判文书",
   CONTRACT: "合同",
+  ID_CARD: "主体资料",
   OTHER: "其他"
 };
 
@@ -76,6 +77,7 @@ const categoryColor: Record<DocumentCategory, string> = {
   PROCEDURE: "#9B7BF7",
   JUDGMENT: "#FBBF24",
   CONTRACT: "#4ADE80",
+  ID_CARD: "#F472B6",
   OTHER: "#9BA8C7"
 };
 
@@ -100,6 +102,7 @@ const CATEGORIES: DocumentCategory[] = [
   "PROCEDURE",
   "JUDGMENT",
   "CONTRACT",
+  "ID_CARD",
   "OTHER"
 ];
 

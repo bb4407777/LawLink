@@ -29,8 +29,7 @@ describe("invoice matter search", () => {
         {
           OR: [
             { title: { contains: "二审", mode: "insensitive" } },
-            { internalCode: { contains: "二审", mode: "insensitive" } },
-            { firmCaseNo: { contains: "二审", mode: "insensitive" } }
+            { internalCode: { contains: "二审", mode: "insensitive" } }
           ]
         }
       ]
